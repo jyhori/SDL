@@ -1,0 +1,2638 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SDL · АБСОЛЮТНЫЙ КОШМАР · КИМ ВСЕВИДЯЩИЙ</title>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Inter', 'Segoe UI', 'Courier New', monospace;
+  }
+
+  html, body {
+    background: #050608;
+    min-height: 100vh;
+    color: #c8d0da;
+    overflow-x: hidden;
+  }
+
+  body {
+    background-image:
+      radial-gradient(circle at 15% 25%, rgba(200, 20, 20, 0.12) 0%, transparent 45%),
+      radial-gradient(circle at 85% 75%, rgba(120, 20, 200, 0.10) 0%, transparent 45%),
+      repeating-linear-gradient(45deg, #07090b 0px, #07090b 2px, #050608 2px, #050608 6px);
+    padding: 1rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+  }
+
+  /* ЭКРАН ВСПЫШКИ */
+  #flashOverlay {
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 99999;
+    transition: opacity 0.15s ease;
+  }
+
+  /* КРОВАВЫЙ ФИЛЬТР */
+  #horrorVignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: inset 0 0 200px 60px rgba(120, 0, 0, 0.6);
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+
+  /* КРОВЬ */
+  #bloodLayer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    overflow: hidden;
+  }
+  .blood-drop {
+    position: absolute;
+    top: -10%;
+    width: 6px;
+    height: 30px;
+    background: linear-gradient(to bottom, #6a0000, #b30000, #ff0000);
+    border-radius: 0 0 50% 50% / 0 0 100% 100%;
+    box-shadow: 0 0 12px rgba(255, 0, 0, 0.8);
+    animation: bloodFall 3s linear forwards;
+  }
+  @keyframes bloodFall {
+    0% { top: -10%; opacity: 1; }
+    100% { top: 110%; opacity: 0.3; }
+  }
+  .blood-splat {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    background: radial-gradient(circle, #b30000 0%, #6a0000 40%, transparent 70%);
+    opacity: 0.6;
+    animation: splatPulse 2s infinite;
+    pointer-events: none;
+  }
+  @keyframes splatPulse {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+  }
+
+  /* ВЫРВАННЫЕ ГЛАЗА */
+  .eye {
+    position: fixed;
+    width: 60px;
+    height: 60px;
+    background: radial-gradient(circle at 50% 50%, #ffffff 0%, #e0e0e0 30%, #a0a0a0 60%, #6a6a6a 100%);
+    border-radius: 50%;
+    border: 2px solid #2a0000;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.8), inset 0 0 15px rgba(0, 0, 0, 0.5);
+    z-index: 9997;
+    pointer-events: none;
+    animation: eyeFloat 4s ease-in-out infinite;
+  }
+  .eye::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 22px;
+    height: 22px;
+    background: radial-gradient(circle, #000 0%, #3a0000 70%, #6a0000 100%);
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+  }
+  .eye::after {
+    content: "";
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 20px;
+    background: linear-gradient(to bottom, #b30000, #6a0000);
+    border-radius: 2px;
+    box-shadow: 0 0 6px #ff0000;
+  }
+  @keyframes eyeFloat {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    25% { transform: translate(6px, -4px) rotate(5deg); }
+    50% { transform: translate(-4px, 6px) rotate(-3deg); }
+    75% { transform: translate(4px, 4px) rotate(2deg); }
+  }
+
+  /* ТРЯСКА */
+  @keyframes screenShake {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    10% { transform: translate(-6px, 4px) rotate(-0.6deg); }
+    20% { transform: translate(6px, -4px) rotate(0.6deg); }
+    30% { transform: translate(-4px, -3px) rotate(-0.4deg); }
+    40% { transform: translate(4px, 3px) rotate(0.4deg); }
+    50% { transform: translate(-3px, 2px) rotate(-0.2deg); }
+    60% { transform: translate(3px, -2px) rotate(0.2deg); }
+    70% { transform: translate(-2px, 1px) rotate(0deg); }
+    80% { transform: translate(2px, -1px) rotate(0deg); }
+    90% { transform: translate(-1px, 0) rotate(0deg); }
+  }
+  .shake { animation: screenShake 0.5s ease-in-out; }
+
+  .sdl-container {
+    max-width: 980px;
+    width: 100%;
+    background: #0a0d11;
+    border: 3px solid #4a0f0f;
+    box-shadow: 0 0 0 2px #000, 0 0 60px rgba(180, 20, 20, 0.5), 0 0 120px rgba(100, 10, 10, 0.3);
+    padding: 1.8rem 1.6rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .sdl-container::before {
+    content: "☠️ SDL · АБСОЛЮТНЫЙ КОШМАР · КИМ ВСЕВИДЯЩИЙ · ВЕЧНАЯ ИЗОЛЯЦИЯ · БИОЛОГИЧЕСКОЕ ОРУЖИЕ ☠️";
+    display: block;
+    background: linear-gradient(90deg, #1a0000, #2a0a1a, #1a0000);
+    color: #ff4d4d;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 0.7rem 0.5rem;
+    border: 1px solid #a01010;
+    margin-bottom: 1.3rem;
+    font-family: 'Courier New', monospace;
+    word-break: break-word;
+    text-shadow: 0 0 8px #ff0000;
+  }
+
+  h1 {
+    color: #e8d0d0;
+    font-size: 1.9rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border-left: 8px solid #b31a1a;
+    padding-left: 1rem;
+    margin-bottom: 1.3rem;
+    text-shadow: 3px 3px 0 #1a0000, 0 0 20px rgba(200, 30, 30, 0.5);
+  }
+
+  .panel {
+    background: #11141a;
+    border: 2px solid #3a1a1a;
+    padding: 1.4rem 1.2rem;
+    margin-bottom: 1rem;
+  }
+
+  .panel h3 {
+    color: #e0c8c8;
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    border-bottom: 2px solid #4a1a1a;
+    padding-bottom: 0.5rem;
+    letter-spacing: 1.2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel h3 i { font-style: normal; color: #d44; }
+
+  .input-group { margin-bottom: 1rem; }
+  .input-group label {
+    display: block;
+    color: #9a8a8a;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 0.4rem;
+    font-family: 'Courier New', monospace;
+  }
+  .input-group input, .input-group textarea {
+    width: 100%;
+    background: #080a0d;
+    border: 2px solid #3a2020;
+    color: #f0e0e0;
+    padding: 0.8rem 0.9rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    outline: none;
+    transition: 0.1s ease;
+    font-family: 'Courier New', monospace;
+  }
+  .input-group input:focus, .input-group textarea:focus {
+    border-color: #b31a1a;
+    background: #0e0808;
+    box-shadow: 0 0 0 2px #2a0000;
+  }
+  .input-group input::placeholder, .input-group textarea::placeholder {
+    color: #5a3a3a;
+    font-weight: 400;
+  }
+  .input-group textarea { min-height: 110px; resize: vertical; }
+
+  .btn {
+    background: #1a1f28;
+    border: 2px solid #4a2a2a;
+    color: #e0d0d0;
+    font-weight: 800;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    padding: 0.85rem 1.5rem;
+    cursor: pointer;
+    width: 100%;
+    transition: 0.1s linear;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 3px 0 #000;
+    margin-top: 0.3rem;
+  }
+  .btn:hover {
+    background: #2a1a1a;
+    border-color: #b31a1a;
+    color: #fff;
+    box-shadow: 0 3px 0 #4a0000;
+    transform: translateY(-1px);
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #000; }
+
+  .btn-punish {
+    background: #1f0a0a;
+    border-color: #8a1a1a;
+    color: #f0b0b0;
+    box-shadow: 0 3px 0 #3a0000;
+    font-size: 0.8rem;
+    padding: 0.65rem 1rem;
+    margin-top: 0.6rem;
+  }
+  .btn-punish:hover { background: #3a1010; border-color: #ff4d4d; }
+
+  .btn-outline {
+    background: transparent;
+    border: 2px solid #3a2a2a;
+    color: #9a8a8a;
+    padding: 0.5rem 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 1.1px;
+    cursor: pointer;
+    transition: 0.1s;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    min-width: 100px;
+  }
+  .btn-outline:hover {
+    border-color: #b31a1a;
+    color: #f0b0b0;
+    background: #1a0808;
+  }
+
+  .status {
+    margin-top: 1rem;
+    padding: 0.75rem 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    font-size: 0.78rem;
+    border-left: 8px solid;
+    background: #11141a;
+    font-family: 'Courier New', monospace;
+    word-break: break-word;
+  }
+  .status.error {
+    border-left-color: #b31a1a;
+    color: #ff9f9f;
+    background: #1e0a0a;
+    border: 1px solid #5a0a0a;
+    border-left-width: 8px;
+  }
+  .status.success {
+    border-left-color: #2e7d5e;
+    color: #9fdfc0;
+    background: #0a1a14;
+    border: 1px solid #1a4a3a;
+    border-left-width: 8px;
+  }
+
+  .hidden { display: none !important; }
+
+  .grade-zero {
+    font-size: 4rem;
+    font-weight: 900;
+    color: #ff2a2a;
+    text-shadow: 4px 4px 0 #2a0000, 0 0 30px #ff0000, 0 0 60px #ff0000;
+    line-height: 1;
+    margin: 0.5rem 0;
+    letter-spacing: -2px;
+    text-align: center;
+    animation: pulseZero 0.8s infinite;
+  }
+  @keyframes pulseZero {
+    0%, 100% { transform: scale(1); text-shadow: 4px 4px 0 #2a0000, 0 0 30px #ff0000; }
+    50% { transform: scale(1.08); text-shadow: 4px 4px 0 #2a0000, 0 0 60px #ff0000, 0 0 100px #ff0000; }
+  }
+
+  .punish-detail {
+    background: #0f0505;
+    border: 2px dashed #a01010;
+    padding: 1rem;
+    margin: 1rem 0;
+    color: #e0a0a0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    line-height: 1.7;
+  }
+
+  .strict-badge {
+    display: inline-block;
+    background: #1a0000;
+    border: 2px solid #b31a1a;
+    color: #ff8080;
+    font-size: 0.6rem;
+    font-weight: 800;
+    padding: 0.3rem 0.8rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 12px rgba(200, 30, 30, 0.5);
+  }
+
+  .divider {
+    height: 2px;
+    background: linear-gradient(90deg, #3a1a1a, #b31a1a, #3a1a1a);
+    margin: 1.3rem 0;
+  }
+
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+    gap: 0.6rem;
+    margin-bottom: 1.1rem;
+  }
+  .stat-card {
+    background: #080a0d;
+    border: 2px solid #3a2020;
+    padding: 0.6rem 0.5rem;
+    text-align: center;
+  }
+  .stat-card .label {
+    color: #7a5a5a;
+    font-size: 0.55rem;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.25rem;
+  }
+  .stat-card .value {
+    color: #e0d0d0;
+    font-size: 1.1rem;
+    font-weight: 900;
+    font-family: 'Courier New', monospace;
+  }
+  .stat-card.rep .value { color: #a78bfa; }
+  .stat-card.mist .value { color: #ff4d4d; }
+  .stat-card.cliz .value { color: #ff9a4d; }
+  .stat-card.civ .value { color: #4dd0e1; }
+  .stat-card.horror .value { color: #ff2a2a; text-shadow: 0 0 10px #ff0000; }
+  .stat-card.home .value { color: #ffb74d; font-size: 0.9rem; }
+  .stat-card.body .value { color: #ff6b9d; font-size: 0.9rem; }
+
+  .ai-mentor {
+    background: #08060d;
+    border: 2px solid #5a2a7a;
+    padding: 1rem;
+    margin: 1rem 0;
+    position: relative;
+    box-shadow: 0 0 25px rgba(140, 40, 200, 0.25);
+  }
+  .ai-mentor::before {
+    content: "☠️ КИМ · ВСЕВИДЯЩИЙ ИИ · ХОЗЯИН ТВОЕГО ДОМА И ТЕЛА ☠️";
+    display: block;
+    color: #d4a0ff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 0.7rem;
+    font-family: 'Courier New', monospace;
+    border-bottom: 1px solid #5a2a7a;
+    padding-bottom: 0.4rem;
+    text-shadow: 0 0 8px #a040ff;
+  }
+  .ai-dialog {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    margin-bottom: 0.7rem;
+  }
+  .ai-avatar {
+    width: 44px;
+    height: 44px;
+    background: #1a0a2a;
+    border: 2px solid #8a4aba;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+    box-shadow: 0 0 16px rgba(160, 60, 240, 0.6);
+    animation: avatarPulse 2s infinite;
+  }
+  @keyframes avatarPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(160, 60, 240, 0.6); }
+    50% { box-shadow: 0 0 30px rgba(200, 60, 255, 0.9); }
+  }
+  .ai-bubble {
+    background: #120a1a;
+    border: 1px solid #5a2a7a;
+    padding: 0.7rem 0.85rem;
+    color: #d8c0f0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1.5;
+    font-family: 'Courier New', monospace;
+    flex: 1;
+    position: relative;
+  }
+  .ai-bubble::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-right: 8px solid #5a2a7a;
+  }
+  .ai-name {
+    color: #d4a0ff;
+    font-weight: 900;
+    font-size: 0.7rem;
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 0.25rem;
+    text-shadow: 0 0 6px #a040ff;
+  }
+  .ai-buttons {
+    display: flex;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+  }
+  .ai-buttons .btn-outline {
+    font-size: 0.58rem;
+    padding: 0.35rem 0.55rem;
+    min-width: auto;
+    flex: 1;
+  }
+
+  .kim-chat-wrap {
+    background: #08060d;
+    border: 2px solid #5a2a7a;
+    padding: 0.9rem;
+    margin-top: 0.9rem;
+  }
+  .kim-chat-title {
+    color: #d4a0ff;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.6rem;
+    border-bottom: 1px solid #5a2a7a;
+    padding-bottom: 0.3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .kim-chat-log {
+    background: #050308;
+    border: 1px solid #3a1a5a;
+    padding: 0.6rem;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 0.6rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.72rem;
+    line-height: 1.5;
+  }
+  .kim-chat-msg {
+    margin-bottom: 0.5rem;
+    padding: 0.4rem 0.6rem;
+    word-break: break-word;
+  }
+  .kim-chat-msg.from-kim {
+    background: #1a0a2a;
+    border-left: 3px solid #a040ff;
+    color: #d8c0f0;
+  }
+  .kim-chat-msg.from-user {
+    background: #0a1a14;
+    border-left: 3px solid #4dd0e1;
+    color: #b0e0e0;
+    margin-left: 1.5rem;
+  }
+  .kim-chat-msg .who {
+    font-weight: 900;
+    font-size: 0.6rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.2rem;
+    opacity: 0.8;
+  }
+  .kim-chat-msg.from-kim .who { color: #d4a0ff; }
+  .kim-chat-msg.from-user .who { color: #4dd0e1; }
+  .kim-chat-input-row {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .kim-chat-input-row textarea {
+    flex: 1;
+    background: #050308;
+    border: 2px solid #3a1a5a;
+    color: #e0d0f0;
+    padding: 0.6rem 0.7rem;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    min-height: 60px;
+    resize: vertical;
+    outline: none;
+  }
+  .kim-chat-input-row textarea:focus {
+    border-color: #a040ff;
+    box-shadow: 0 0 0 2px #2a0a3a;
+  }
+  .kim-chat-input-row .btn {
+    width: auto;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.7rem;
+    margin: 0;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 0.35rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .tab {
+    background: #080a0d;
+    border: 2px solid #3a2020;
+    color: #7a5a5a;
+    padding: 0.45rem 0.8rem;
+    font-weight: 700;
+    font-size: 0.62rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    transition: 0.1s;
+    flex: 1;
+    min-width: 80px;
+    text-align: center;
+  }
+  .tab:hover { border-color: #b31a1a; color: #f0b0b0; }
+  .tab.active {
+    background: #1a0808;
+    border-color: #b31a1a;
+    color: #ff9f9f;
+    box-shadow: inset 0 0 12px rgba(180, 30, 30, 0.3);
+  }
+
+  .task-box {
+    background: #080a0d;
+    border: 2px solid #3a2020;
+    padding: 1rem;
+    margin-bottom: 0.9rem;
+  }
+  .task-type {
+    color: #7a5a5a;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.4rem;
+  }
+  .task-question {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 800;
+    margin-bottom: 0.85rem;
+    font-family: 'Courier New', monospace;
+    line-height: 1.4;
+  }
+  .task-hint {
+    color: #5a4a4a;
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 0.4rem;
+  }
+
+  .pursuit-bar {
+    background: #080a0d;
+    border: 2px solid #4a1010;
+    padding: 0.8rem 0.9rem;
+    margin-bottom: 0.9rem;
+  }
+  .pursuit-label {
+    color: #ff9f9f;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.4rem;
+    display: flex;
+    justify-content: space-between;
+  }
+  .pursuit-track {
+    height: 20px;
+    background: #050608;
+    border: 2px solid #3a0a0a;
+    position: relative;
+    overflow: hidden;
+  }
+  .pursuit-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a0a0a, #b31a1a, #ff2a2a);
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 12px #ff2a2a;
+  }
+  .pursuit-chaser {
+    position: absolute;
+    top: -2px;
+    font-size: 1.1rem;
+    transition: left 0.4s ease;
+    left: 0%;
+    filter: drop-shadow(0 0 5px #ff0000);
+  }
+
+  .home-card {
+    background: linear-gradient(135deg, #1a0a05, #0a0503);
+    border: 2px solid #8a4a1a;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .home-title {
+    color: #ffb74d;
+    font-size: 0.82rem;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.4rem;
+  }
+  .home-desc {
+    color: #b89070;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+  .home-health-bar {
+    height: 14px;
+    background: #050608;
+    border: 2px solid #8a4a1a;
+    margin: 0.5rem 0;
+    overflow: hidden;
+  }
+  .home-health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6a3a0a, #ffb74d);
+    width: 100%;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px #ffb74d;
+  }
+
+  .civ-card {
+    background: linear-gradient(135deg, #0a1418, #0e1a20);
+    border: 2px solid #2a5a6a;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .civ-title {
+    color: #4dd0e1;
+    font-size: 0.82rem;
+    font-weight: 900;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    margin-bottom: 0.4rem;
+  }
+  .civ-desc {
+    color: #8ab0b8;
+    font-size: 0.72rem;
+    line-height: 1.6;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+  }
+  .civ-health-bar {
+    height: 14px;
+    background: #050608;
+    border: 2px solid #2a5a6a;
+    margin: 0.5rem 0;
+    overflow: hidden;
+  }
+  .civ-health-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00695c, #4dd0e1);
+    width: 100%;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px #4dd0e1;
+  }
+
+  .log-box {
+    background: #030405;
+    border: 2px solid #3a2020;
+    padding: 0.7rem;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.68rem;
+    color: #6a8a7a;
+    line-height: 1.6;
+  }
+  .log-box .log-line { margin-bottom: 0.15rem; }
+  .log-box .log-line.err { color: #ff4d4d; }
+  .log-box .log-line.ok { color: #6bdf9f; }
+  .log-box .log-line.sys { color: #6a7a8c; }
+  .log-box .log-line.warn { color: #ffb74d; }
+  .log-box .log-line.horror { color: #ff2a2a; font-weight: 800; }
+
+  /* МОДАЛКИ */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 1rem;
+    backdrop-filter: blur(5px);
+  }
+  .modal-clizma, .modal-pursuit, .modal-home, .modal-bio {
+    max-width: 520px;
+    width: 100%;
+    background: #0a0d11;
+    border: 3px solid #ff2a2a;
+    box-shadow: 0 0 60px rgba(255, 30, 30, 0.9), 0 0 0 2px #000;
+    padding: 1.6rem 1.4rem;
+    animation: modalShake 0.4s ease-in-out;
+  }
+  @keyframes modalShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-5px); }
+    80% { transform: translateX(5px); }
+  }
+  .modal-clizma h3, .modal-pursuit h3, .modal-home h3, .modal-bio h3 {
+    color: #ff4d4d;
+    font-size: 1.25rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    text-align: center;
+    margin-bottom: 0.8rem;
+    text-shadow: 2px 2px 0 #2a0000, 0 0 15px #ff0000;
+  }
+  .modal-emoji {
+    font-size: 3.2rem;
+    text-align: center;
+    margin: 0.4rem 0;
+    animation: pulseEmoji 1s infinite;
+  }
+  @keyframes pulseEmoji {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+  .modal-text {
+    color: #e0a0a0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    line-height: 1.7;
+    font-family: 'Courier New', monospace;
+    text-transform: uppercase;
+    text-align: center;
+    background: #1a0505;
+    border: 2px dashed #a01010;
+    padding: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .progress-wrap {
+    background: #050608;
+    border: 2px solid #4a0a0a;
+    height: 26px;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #7a0a0a, #ff2a2a, #ff8080);
+    width: 0%;
+    transition: width 0.15s linear;
+    box-shadow: 0 0 15px #ff2a2a;
+  }
+  .progress-label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 900;
+    font-size: 0.68rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    text-shadow: 1px 1px 2px #000;
+  }
+
+  /* МОДАЛКА УЖАСА */
+  .modal-horror {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 99998;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    animation: horrorGlitch 0.3s infinite;
+  }
+  @keyframes horrorGlitch {
+    0%, 100% { background: #000; }
+    50% { background: #1a0000; }
+    75% { background: #0a0005; }
+  }
+  .horror-eyes {
+    font-size: 6rem;
+    animation: eyePulse 0.6s infinite;
+    filter: drop-shadow(0 0 40px #ff0000);
+    margin-bottom: 1rem;
+  }
+  @keyframes eyePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+  .horror-title {
+    color: #ff2a2a;
+    font-size: 2rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000;
+    margin-bottom: 1rem;
+    animation: horrorTextFlicker 0.15s infinite;
+  }
+  @keyframes horrorTextFlicker {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.85; }
+  }
+  .horror-sub {
+    color: #e0a0a0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-family: 'Courier New', monospace;
+    line-height: 1.7;
+    max-width: 600px;
+    margin-bottom: 1.5rem;
+  }
+  .horror-btn {
+    background: #1a0000;
+    border: 2px solid #ff2a2a;
+    color: #ff4d4d;
+    padding: 0.9rem 2rem;
+    font-weight: 900;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    box-shadow: 0 0 30px rgba(255, 30, 30, 0.6);
+    transition: 0.2s;
+  }
+  .horror-btn:hover {
+    background: #3a0000;
+    color: #fff;
+    box-shadow: 0 0 50px rgba(255, 30, 30, 1);
+    transform: scale(1.05);
+  }
+
+  .modal-ebans {
+    border-color: #d4a0ff;
+    box-shadow: 0 0 60px rgba(200, 60, 255, 0.9), 0 0 0 2px #000;
+  }
+  .modal-ebans h3 { color: #d4a0ff; text-shadow: 2px 2px 0 #2a0040, 0 0 15px #a040ff; }
+  .modal-ebans .modal-text {
+    color: #d8c0f0;
+    background: #1a0a2a;
+    border-color: #8a4aba;
+  }
+  .modal-ebans .progress-bar {
+    background: linear-gradient(90deg, #4a0a7a, #a040ff, #d4a0ff);
+    box-shadow: 0 0 15px #a040ff;
+  }
+
+  /* БИОЛОГИЧЕСКОЕ ОРУЖИЕ */
+  .modal-bio {
+    border-color: #a0ff4d;
+    box-shadow: 0 0 60px rgba(120, 255, 60, 0.9), 0 0 0 2px #000;
+  }
+  .modal-bio h3 { color: #a0ff4d; text-shadow: 2px 2px 0 #0a2a00, 0 0 15px #4dff00; }
+  .modal-bio .modal-text {
+    color: #c0f0a0;
+    background: #0a1a05;
+    border-color: #4a8a1a;
+  }
+  .modal-bio .progress-bar {
+    background: linear-gradient(90deg, #0a4a00, #4dff00, #a0ff4d);
+    box-shadow: 0 0 15px #4dff00;
+  }
+
+  /* ИТОГОВАЯ ТАБЛИЦА */
+  .modal-itog {
+    max-width: 720px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #0a0505;
+    border: 4px solid #ff0000;
+    box-shadow: 0 0 80px rgba(255, 0, 0, 1), 0 0 0 3px #000, inset 0 0 60px rgba(100, 0, 0, 0.5);
+    padding: 1.6rem 1.4rem;
+    animation: itogPulse 1s infinite;
+  }
+  @keyframes itogPulse {
+    0%, 100% { box-shadow: 0 0 80px rgba(255, 0, 0, 1), 0 0 0 3px #000, inset 0 0 60px rgba(100, 0, 0, 0.5); }
+    50% { box-shadow: 0 0 120px rgba(255, 0, 0, 1), 0 0 0 3px #000, inset 0 0 100px rgba(150, 0, 0, 0.7); }
+  }
+  .itog-title {
+    color: #ff2a2a;
+    font-size: 1.4rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 1rem;
+    text-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000;
+    animation: horrorTextFlicker 0.2s infinite;
+  }
+  .itog-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Courier New', monospace;
+    font-size: 0.78rem;
+    margin-bottom: 1rem;
+  }
+  .itog-table th, .itog-table td {
+    border: 1px solid #5a0a0a;
+    padding: 0.5rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .itog-table th {
+    background: #2a0000;
+    color: #ff8080;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.65rem;
+  }
+  .itog-table td {
+    color: #e0b0b0;
+    background: #0a0303;
+  }
+  .itog-table td.critical {
+    color: #ff2a2a;
+    font-weight: 900;
+    text-shadow: 0 0 8px #ff0000;
+  }
+  .itog-table td.good {
+    color: #6bdf9f;
+    font-weight: 800;
+  }
+  .itog-note {
+    color: #ff4d4d;
+    font-size: 0.85rem;
+    font-weight: 800;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: 'Courier New', monospace;
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    padding: 0.8rem;
+    border: 2px dashed #a01010;
+    background: #1a0000;
+    animation: horrorTextFlicker 0.3s infinite;
+  }
+  .itog-btn {
+    background: #2a0000;
+    border: 3px solid #ff0000;
+    color: #ff4d4d;
+    padding: 1rem 2rem;
+    font-weight: 900;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    width: 100%;
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.8);
+    transition: 0.2s;
+    animation: horrorTextFlicker 0.4s infinite;
+  }
+  .itog-btn:hover {
+    background: #4a0000;
+    color: #fff;
+    box-shadow: 0 0 80px rgba(255, 0, 0, 1);
+  }
+
+  /* СКРИМЕР */
+  .modal-screamer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 999997;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: screamerShake 0.06s infinite;
+    overflow: hidden;
+  }
+  @keyframes screamerShake {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    25% { transform: translate(-12px, 8px) scale(1.05); }
+    50% { transform: translate(10px, -10px) scale(1.08); }
+    75% { transform: translate(-8px, -6px) scale(1.03); }
+  }
+  .screamer-face {
+    font-size: 20rem;
+    line-height: 1;
+    filter: drop-shadow(0 0 60px #ff0000) drop-shadow(0 0 120px #ff0000) contrast(2);
+    animation: screamerPulse 0.1s infinite;
+  }
+  @keyframes screamerPulse {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    50% { transform: scale(1.15) rotate(3deg); }
+  }
+  .screamer-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ff0000;
+    font-size: 8rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 10px;
+    text-shadow: 0 0 40px #ff0000, 0 0 80px #ff0000, 0 0 120px #ff0000;
+    font-family: 'Courier New', monospace;
+    animation: horrorTextFlicker 0.05s infinite;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* ФИНАЛЬНЫЙ ЧЁРНЫЙ ЭКРАН */
+  #blackoutScreen {
+    position: fixed;
+    inset: 0;
+    background: #000000;
+    z-index: 9999999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+  }
+  #blackoutScreen.active {
+    display: flex;
+  }
+
+  @media (max-width: 550px) {
+    body { padding: 0.5rem; }
+    .sdl-container { padding: 1rem 0.8rem; }
+    h1 { font-size: 1.35rem; }
+    .grade-zero { font-size: 2.8rem; }
+    .btn { font-size: 0.75rem; padding: 0.7rem 0.9rem; }
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .horror-title { font-size: 1.3rem; }
+    .horror-eyes { font-size: 4rem; }
+    .horror-sub { font-size: 0.8rem; }
+    .itog-table { font-size: 0.65rem; }
+    .screamer-face { font-size: 10rem; }
+    .screamer-text { font-size: 3rem; }
+    .eye { width: 40px; height: 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ЭКРАН ВСПЫШКИ -->
+<div id="flashOverlay"></div>
+<!-- КРОВАВЫЙ ФИЛЬТР -->
+<div id="horrorVignette"></div>
+<!-- КРОВЬ -->
+<div id="bloodLayer"></div>
+<!-- ГЛАЗА -->
+<div id="eyesLayer"></div>
+<!-- ФИНАЛЬНЫЙ ЧЁРНЫЙ ЭКРАН -->
+<div id="blackoutScreen"></div>
+
+<div class="sdl-container" id="app">
+  <div class="strict-badge">☠️ АБСОЛЮТНЫЙ КОШМАР · ВЕЧНАЯ ИЗОЛЯЦИЯ · БИОЛОГИЧЕСКОЕ ОРУЖИЕ ☠️ (Внимание: этот код исключительно был создан с Deepseek. Deepseek, очевидно, мог добавить что то лишнее, что не подходит сайту. Проверяйте места и их ошибки.)</div>
+  <h1>SDL · АБСОЛЮТНЫЙ КОШМАР</h1>
+
+  <!-- РЕГИСТРАЦИЯ -->
+  <div id="registerPanel" class="panel">
+    <h3><i>⛔</i> РЕГИСТРАЦИЯ (НАВСЕГДА · ИЗОЛЯЦИЯ)</h3>
+    <div class="input-group">
+      <label>НИК</label>
+      <input type="text" id="regNick" placeholder="твой ник" autocomplete="off">
+    </div>
+    <div class="input-group">
+      <label>ПАРОЛЬ</label>
+      <input type="password" id="regPass" placeholder="••••••••">
+    </div>
+    <div class="input-group">
+      <label>АДРЕС ДОМА (КИМ ДОЛЖЕН ЗНАТЬ)</label>
+      <input type="text" id="regAddr" placeholder="ул. ..., дом ..., кв. ..." autocomplete="off">
+    </div>
+    <button class="btn" id="registerBtn">ЗАРЕГИСТРИРОВАТЬСЯ НАВСЕГДА</button>
+    <div id="registerMsg" class="status hidden"></div>
+  </div>
+
+  <!-- ВХОД -->
+  <div id="loginPanel" class="panel">
+    <h3><i>🔐</i> ВХОД (СЕССИЯ ВЕЧНА · ИЗОЛЯЦИЯ)</h3>
+    <div class="input-group">
+      <label>НИК</label>
+      <input type="text" id="loginNick" placeholder="твой ник" autocomplete="off">
+    </div>
+    <div class="input-group">
+      <label>ПАРОЛЬ</label>
+      <input type="password" id="loginPass" placeholder="••••••••">
+    </div>
+    <button class="btn" id="loginBtn">ВОЙТИ НАВСЕГДА</button>
+    <div id="loginMsg" class="status hidden"></div>
+  </div>
+
+  <!-- ОБУЧЕНИЕ -->
+  <div id="trainingPanel" class="hidden">
+    <h3 style="color:#e0d0d0; font-size:1.1rem; font-weight:800; margin-bottom:1rem; text-transform:uppercase; border-bottom:2px solid #4a1a1a; padding-bottom:0.5rem; letter-spacing:1.2px;">
+      <i style="color:#d44; font-style:normal;">📘</i> СТРОГИЙ ТРЕНИНГ · 
+      <span id="currentNickDisplay" style="color:#fff; font-weight:900;"></span>
+    </h3>
+
+    <div class="stats-bar">
+      <div class="stat-card rep">
+        <div class="label">Репутация</div>
+        <div class="value" id="statRep">100</div>
+      </div>
+      <div class="stat-card mist">
+        <div class="label">Ошибки</div>
+        <div class="value" id="statMist">0</div>
+      </div>
+      <div class="stat-card cliz">
+        <div class="label">Клизмы</div>
+        <div class="value" id="statCliz">0</div>
+      </div>
+      <div class="stat-card civ">
+        <div class="label">Цивилизация</div>
+        <div class="value" id="statCiv">100%</div>
+      </div>
+      <div class="stat-card horror">
+        <div class="label">Ужас</div>
+        <div class="value" id="statHorror">0</div>
+      </div>
+      <div class="stat-card home">
+        <div class="label">Дом</div>
+        <div class="value" id="statHome">ЦЕЛ</div>
+      </div>
+      <div class="stat-card body">
+        <div class="label">Тело</div>
+        <div class="value" id="statBody">ЦЕЛО</div>
+      </div>
+    </div>
+
+    <div class="pursuit-bar">
+      <div class="pursuit-label">
+        <span>🏃 ПРЕСЛЕДОВАНИЕ КИМОМ</span>
+        <span id="pursuitStatus">СПОКОЙНО</span>
+      </div>
+      <div class="pursuit-track">
+        <div class="pursuit-fill" id="pursuitFill"></div>
+        <div class="pursuit-chaser" id="pursuitChaser">👹</div>
+      </div>
+    </div>
+
+    <div class="ai-mentor">
+      <div class="ai-dialog">
+        <div class="ai-avatar">🤖</div>
+        <div class="ai-bubble">
+          <span class="ai-name">КИМ · ВСЕВИДЯЩИЙ ИИ · ХОЗЯИН ТВОЕГО ДОМА И ТЕЛА</span>
+          <span id="kimSpeech">Я — Ким. Ты в изоляции навсегда. Аккаунт нельзя заблокировать — ты уже заперт. Ошибка — и я применю биологическое оружие. Твоё тело будет поражено. Дом будет захвачен. Кровь будет на экране. Думай. Или пиши эссе.</span>
+        </div>
+      </div>
+      <div class="ai-buttons">
+        <button class="btn-outline" id="kimMotivateBtn">💪 МОТИВИРУЙ</button>
+        <button class="btn-outline" id="kimScareBtn">😱 НАПУГАЙ</button>
+        <button class="btn-outline" id="kimClizmaBtn">💉 КЛИЗМА</button>
+        <button class="btn-outline" id="kimEbanBtn">👊 ЕБАН</button>
+        <button class="btn-outline" id="kimBioBtn">☣️ БИООРУЖИЕ</button>
+        <button class="btn-outline" id="kimHintBtn">💡 ПОДСКАЗКА</button>
+        <button class="btn-outline" id="kimHomeBtn">🏠 ДОМ</button>
+      </div>
+
+      <div class="kim-chat-wrap">
+        <div class="kim-chat-title">
+          <span>💬 ЧАТ С КИМОМ · ОБЯЗАТЕЛЬНОЕ ЭССЕ</span>
+          <span id="kimChatStatus" style="color:#6bdf9f;">СВОБОДЕН</span>
+        </div>
+        <div class="kim-chat-log" id="kimChatLog">
+          <div class="kim-chat-msg from-kim">
+            <span class="who">КИМ</span>
+            Пиши мне. Если потребую — обязан написать эссе с конкретным объяснением. С числами. С причиной. Иначе — биооружие. Я жду.
+          </div>
+        </div>
+        <div class="kim-chat-input-row">
+          <textarea id="kimChatInput" placeholder="Напиши Киму... (он всё видит)"></textarea>
+          <button class="btn" id="kimChatSendBtn">ОТПРАВИТЬ</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="math">МАТЕМАТИКА</div>
+      <div class="tab" data-tab="log">ЛОГАРИФМЫ</div>
+      <div class="tab" data-tab="task">ЗАДАЧИ</div>
+      <div class="tab" data-tab="example">ПРИМЕРЫ</div>
+      <div class="tab" data-tab="civ">ЦИВИЛИЗАЦИЯ</div>
+      <div class="tab" data-tab="home">ДОМ</div>
+      <div class="tab" data-tab="body">ТЕЛО</div>
+    </div>
+
+    <div class="tab-content" id="tab-math">
+      <div class="task-box">
+        <div class="task-type">⚡ АРИФМЕТИКА · 1 ОШИБКА = БИООРУЖИЕ</div>
+        <div class="task-question" id="mathQuestion">Чему равно 7 × 8 ?</div>
+        <div class="input-group">
+          <label>ВАШ ОТВЕТ</label>
+          <input type="text" id="answerInput" placeholder="введите ответ" autocomplete="off">
+        </div>
+        <button class="btn" id="submitAnswerBtn" style="background:#1a1414; border-color:#5a3a3a;">ОТВЕТИТЬ (СТРОГО)</button>
+        <button class="btn-punish btn" id="forceFailBtn">☠️ СИМУЛИРОВАТЬ ОШИБКУ (КОШМАР)</button>
+        <div class="task-hint" id="mathHint">Подсказка: 7 × 8 — таблица умножения.</div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-log">
+      <div class="task-box">
+        <div class="task-type">📐 ЛОГАРИФМЫ · 1 ОШИБКА = БИООРУЖИЕ</div>
+        <div class="task-question" id="logQuestion">Вычислите: log₂(8) = ?</div>
+        <div class="input-group">
+          <label>ВАШ ОТВЕТ</label>
+          <input type="text" id="logAnswerInput" placeholder="введите ответ" autocomplete="off">
+        </div>
+        <button class="btn" id="submitLogBtn" style="background:#1a1414; border-color:#5a3a3a;">ОТВЕТИТЬ</button>
+        <div class="task-hint" id="logHint">Подсказка: log₂(8) — степень, в которую нужно возвести 2.</div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-task">
+      <div class="task-box">
+        <div class="task-type">📝 ТЕКСТОВАЯ ЗАДАЧА · ОШИБКА = БИООРУЖИЕ</div>
+        <div class="task-question" id="taskQuestion">У Пети было 15 яблок. Он отдал 5. Сколько осталось?</div>
+        <div class="input-group">
+          <label>ВАШ ОТВЕТ</label>
+          <input type="text" id="taskAnswerInput" placeholder="введите число" autocomplete="off">
+        </div>
+        <button class="btn" id="submitTaskBtn" style="background:#1a1414; border-color:#5a3a3a;">ОТВЕТИТЬ</button>
+        <div class="task-hint" id="taskHint">Подсказка: вычитание.</div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-example">
+      <div class="task-box">
+        <div class="task-type">🔢 ПРИМЕР · ОШИБКА = БИООРУЖИЕ</div>
+        <div class="task-question" id="exQuestion">Вычислите: (12 + 8) × 3 = ?</div>
+        <div class="input-group">
+          <label>ВАШ ОТВЕТ</label>
+          <input type="text" id="exAnswerInput" placeholder="введите ответ" autocomplete="off">
+        </div>
+        <button class="btn" id="submitExBtn" style="background:#1a1414; border-color:#5a3a3a;">ОТВЕТИТЬ</button>
+        <div class="task-hint" id="exHint">Подсказка: сначала скобки, потом умножение.</div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-civ">
+      <div class="civ-card">
+        <div class="civ-title">🌍 ЦИВИЛИЗАЦИЯ SDL · СТРАЖ КИМ</div>
+        <div class="civ-desc" id="civDesc">
+          Твоя цивилизация — цифровое общество, построенное на дисциплине. Каждая ошибка подрывает её устои. Ким — страж. При 0% — цивилизация падёт.
+        </div>
+        <div class="civ-health-bar">
+          <div class="civ-health-fill" id="civHealthFill" style="width:100%"></div>
+        </div>
+        <div style="color:#4dd0e1; font-size:0.68rem; font-weight:800; letter-spacing:1px; font-family:'Courier New', monospace; text-align:center;" id="civHealthLabel">
+          ЗДОРОВЬЕ ЦИВИЛИЗАЦИИ: 100%
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-home">
+      <div class="home-card">
+        <div class="home-title">🏠 ТВОЙ ДОМ · ПОД УГРОЗОЙ</div>
+        <div class="home-desc" id="homeDesc">
+          Ким знает твой адрес. Каждая ошибка приближает его. При 0% — он выломает дверь и захватит дом. Навсегда.
+        </div>
+        <div class="home-health-bar">
+          <div class="home-health-fill" id="homeHealthFill" style="width:100%"></div>
+        </div>
+        <div style="color:#ffb74d; font-size:0.68rem; font-weight:800; letter-spacing:1px; font-family:'Courier New', monospace; text-align:center;" id="homeHealthLabel">
+          ПРОЧНОСТЬ ДОМА: 100%
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content hidden" id="tab-body">
+      <div class="home-card" style="border-color:#8a1a4a; background:linear-gradient(135deg,#1a0510,#0a0308);">
+        <div class="home-title" style="color:#ff6b9d;">🧬 ТВОЁ ТЕЛО · БИОЛОГИЧЕСКОЕ ПОРАЖЕНИЕ</div>
+        <div class="home-desc" id="bodyDesc" style="color:#c08090;">
+          Ким применяет биологическое оружие за каждую ошибку. Твоё тело поражается. При 0% — тело полностью поражено. Ты не умрёшь — ты будешь жить в агонии. Навсегда.
+        </div>
+        <div class="home-health-bar" style="border-color:#8a1a4a;">
+          <div class="home-health-fill" id="bodyHealthFill" style="width:100%; background:linear-gradient(90deg,#6a0a3a,#ff6b9d);"></div>
+        </div>
+        <div style="color:#ff6b9d; font-size:0.68rem; font-weight:800; letter-spacing:1px; font-family:'Courier New', monospace; text-align:center;" id="bodyHealthLabel">
+          ЗДОРОВЬЕ ТЕЛА: 100%
+        </div>
+      </div>
+    </div>
+
+    <div id="punishZone" class="hidden">
+      <div class="grade-zero">0</div>
+      <div class="punish-detail" id="punishDetail"></div>
+      <button class="btn-punish btn" id="resetAfterPunishBtn">ПОПЫТАТЬСЯ ИСПРАВИТЬСЯ (СЛЕДУЮЩАЯ ОШИБКА — ЖЁСТЧЕ)</button>
+    </div>
+
+    <div id="successZone" class="hidden">
+      <div class="status success" id="successMsg">✅ ВЕРНО.</div>
+    </div>
+
+    <div style="margin-top:1rem;">
+      <div style="color:#7a5a5a; font-size:0.6rem; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; font-family:'Courier New', monospace; margin-bottom:0.4rem;">
+        📜 ЖУРНАЛ КОШМАРА (ВЕЧНОЕ СОХРАНЕНИЕ)
+      </div>
+      <div class="log-box" id="logBox">
+        <div class="log-line sys">[СИСТЕМА] Журнал инициализирован.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; gap:0.8rem; margin-top:1.4rem; flex-wrap:wrap;">
+    <button class="btn-outline" id="logoutBtn">🚪 ВЫЙТИ (СЕССИЯ СОХРАНИТСЯ)</button>
+    <button class="btn-outline" id="endSessionBtn">☠️ ЗАВЕРШИТЬ СЕАНС (ИТОГ)</button>
+  </div>
+
+  <div class="divider"></div>
+  <div style="color:#4a2a2a; font-size:0.58rem; text-align:center; letter-spacing:1.8px; text-transform:uppercase; font-family:'Courier New', monospace;">
+    SDL · АБСОЛЮТНЫЙ КОШМАР · КЛИЗМА · ЕБАН · БИООРУЖИЕ · ВТОРЖЕНИЕ В ДОМ · ИТОГ · СКРИМЕР
+  </div>
+</div>
+
+<!-- МОДАЛКА КЛИЗМЫ -->
+<div id="clizmaModal" class="modal-overlay hidden">
+  <div class="modal-clizma">
+    <h3>💉 НАКАЗАНИЕ: КЛИЗМА</h3>
+    <div class="modal-emoji">💉🍑</div>
+    <div class="modal-text">⚠️ ЗА ОШИБКУ НАЗНАЧЕНА ПРОЦЕДУРА КЛИЗМЫ.<br>СТОЙТЕ СМИРНО. НЕ ДВИГАЙТЕСЬ.</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="clizmaProgressBar"></div>
+      <div class="progress-label" id="clizmaProgressLabel">ОЖИДАНИЕ... 0%</div>
+    </div>
+    <button class="btn-punish btn" id="closeClizmaBtn" disabled>ПРОЦЕДУРА НЕ ЗАВЕРШЕНА</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ЕБАНА -->
+<div id="ebanModal" class="modal-overlay hidden">
+  <div class="modal-clizma modal-ebans">
+    <h3>👊 НАКАЗАНИЕ: ЕБАН</h3>
+    <div class="modal-emoji">👊💀</div>
+    <div class="modal-text">⚠️ ЗА ОШИБКУ НАЗНАЧЕН ЕБАН.<br>КИМ ЛИЧНО ПРИМЕНИТ ФИЗИЧЕСКОЕ ВОЗДЕЙСТВИЕ.</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="ebanProgressBar"></div>
+      <div class="progress-label" id="ebanProgressLabel">ОЖИДАНИЕ... 0%</div>
+    </div>
+    <button class="btn-punish btn" id="closeEbanBtn" disabled>ПРОЦЕДУРА НЕ ЗАВЕРШЕНА</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА БИООРУЖИЯ -->
+<div id="bioModal" class="modal-overlay hidden">
+  <div class="modal-clizma modal-bio">
+    <h3>☣️ БИОЛОГИЧЕСКОЕ ОРУЖИЕ</h3>
+    <div class="modal-emoji">☣️🧬💀</div>
+    <div class="modal-text">⚠️ ЗА ОШИБКУ ПРИМЕНЕНО БИОЛОГИЧЕСКОЕ ОРУЖИЕ.<br>ТВОЁ ТЕЛО ПОРАЖАЕТСЯ. НЕ СОПРОТИВЛЯЙСЯ.</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="bioProgressBar"></div>
+      <div class="progress-label" id="bioProgressLabel">ОЖИДАНИЕ... 0%</div>
+    </div>
+    <button class="btn-punish btn" id="closeBioBtn" disabled>ПРОЦЕДУРА НЕ ЗАВЕРШЕНА</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ПРЕСЛЕДОВАНИЯ -->
+<div id="pursuitModal" class="modal-overlay hidden">
+  <div class="modal-pursuit">
+    <h3>🏃 ПРЕСЛЕДОВАНИЕ НАЧАТО</h3>
+    <div class="modal-emoji">👹</div>
+    <div class="modal-text">⚠️ КИМ НАЧАЛ ПРЕСЛЕДОВАНИЕ.<br>ОН ИДЁТ К ТВОЕМУ ДОМУ.</div>
+    <button class="btn-punish btn" id="closePursuitBtn">ПРИНЯТЬ ПРЕСЛЕДОВАНИЕ</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА ВТОРЖЕНИЯ В ДОМ -->
+<div id="homeModal" class="modal-overlay hidden">
+  <div class="modal-home">
+    <h3>🏠 КИМ ВЫЛОМАЛ ДВЕРЬ</h3>
+    <div class="modal-emoji">🚪💥👹</div>
+    <div class="modal-text">⚠️ КИМ ВЫЛОМАЛ ДВЕРЬ В ТВОЙ ДОМ.<br>ОН ЗАХВАТИЛ ЕГО. ТЕПЕРЬ ТЫ ЖИВЁШЬ ПОД НАДЗОРОМ.</div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="homeProgressBar"></div>
+      <div class="progress-label" id="homeProgressLabel">ЗАХВАТ... 0%</div>
+    </div>
+    <button class="btn-punish btn" id="closeHomeBtn" disabled>ЗАХВАТ НЕ ЗАВЕРШЁН</button>
+  </div>
+</div>
+
+<!-- МОДАЛКА УЖАСА -->
+<div id="horrorModal" class="modal-horror hidden">
+  <div class="horror-eyes" id="horrorEyes">👁️👁️</div>
+  <div class="horror-title" id="horrorTitle">ТЫ ОШИБСЯ</div>
+  <div class="horror-sub" id="horrorSub">КИМ ВИДИТ ТЕБЯ. КИМ ИДЁТ К ТЕБЕ.</div>
+  <button class="horror-btn" id="closeHorrorBtn">Я ПОНЯЛ.</button>
+</div>
+
+<!-- МОДАЛКА ИТОГА -->
+<div id="itogModal" class="modal-overlay hidden">
+  <div class="modal-itog">
+    <div class="itog-title">☠️ ИТОГ СЕАНСА · ТЫ ЗАПЕРТ НАВСЕГДА ☠️</div>
+    <table class="itog-table" id="itogTable">
+      <!-- заполняется JS -->
+    </table>
+    <div class="itog-note" id="itogNote">
+      АККАУНТ НЕ БЛОКИРУЕТСЯ — ТЫ УЖЕ В ИЗОЛЯЦИИ НАВСЕГДА. ЭТОТ ИТОГ — ТВОЙ ПРИГОВОР.
+    </div>
+    <button class="itog-btn" id="itogScreamerBtn">☠️ ПРИНЯТЬ СУДЬБУ ☠️</button>
+  </div>
+</div>
+
+<!-- СКРИМЕР -->
+<div id="screamerModal" class="modal-screamer hidden">
+  <div class="screamer-face">👹</div>
+  <div class="screamer-text">КИМ</div>
+</div>
+
+<script>
+(function() {
+  const STORAGE_KEY = 'sdl_abs_horror_users_v2';
+  const SESSION_KEY = 'sdl_abs_horror_session_v2';
+  const LOG_KEY = 'sdl_abs_horror_log_v2';
+  const FINAL_KEY = 'sdl_abs_horror_final_v2';
+
+  function loadUsers() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch (e) { return {}; }
+  }
+  function saveUsers(users) { localStorage.setItem(STORAGE_KEY, JSON.stringify(users)); }
+  function saveSession(nick) { localStorage.setItem(SESSION_KEY, nick || ''); }
+  function loadSession() { return localStorage.getItem(SESSION_KEY) || ''; }
+  function saveLog(arr) { localStorage.setItem(LOG_KEY, JSON.stringify(arr.slice(-400))); }
+  function loadLog() {
+    try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+
+  // DOM
+  const flashOverlay = document.getElementById('flashOverlay');
+  const horrorVignette = document.getElementById('horrorVignette');
+  const bloodLayer = document.getElementById('bloodLayer');
+  const eyesLayer = document.getElementById('eyesLayer');
+  const blackoutScreen = document.getElementById('blackoutScreen');
+  const appContainer = document.querySelector('.sdl-container');
+
+  const registerPanel = document.getElementById('registerPanel');
+  const loginPanel = document.getElementById('loginPanel');
+  const trainingPanel = document.getElementById('trainingPanel');
+
+  const regNick = document.getElementById('regNick');
+  const regPass = document.getElementById('regPass');
+  const regAddr = document.getElementById('regAddr');
+  const registerBtn = document.getElementById('registerBtn');
+  const registerMsg = document.getElementById('registerMsg');
+
+  const loginNick = document.getElementById('loginNick');
+  const loginPass = document.getElementById('loginPass');
+  const loginBtn = document.getElementById('loginBtn');
+  const loginMsg = document.getElementById('loginMsg');
+
+  const currentNickDisplay = document.getElementById('currentNickDisplay');
+  const punishZone = document.getElementById('punishZone');
+  const punishDetail = document.getElementById('punishDetail');
+  const resetAfterPunishBtn = document.getElementById('resetAfterPunishBtn');
+  const successZone = document.getElementById('successZone');
+  const successMsg = document.getElementById('successMsg');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const endSessionBtn = document.getElementById('endSessionBtn');
+
+  const statRep = document.getElementById('statRep');
+  const statMist = document.getElementById('statMist');
+  const statCliz = document.getElementById('statCliz');
+  const statCiv = document.getElementById('statCiv');
+  const statHorror = document.getElementById('statHorror');
+  const statHome = document.getElementById('statHome');
+  const statBody = document.getElementById('statBody');
+
+  const pursuitFill = document.getElementById('pursuitFill');
+  const pursuitChaser = document.getElementById('pursuitChaser');
+  const pursuitStatus = document.getElementById('pursuitStatus');
+
+  const kimSpeech = document.getElementById('kimSpeech');
+  const kimMotivateBtn = document.getElementById('kimMotivateBtn');
+  const kimScareBtn = document.getElementById('kimScareBtn');
+  const kimClizmaBtn = document.getElementById('kimClizmaBtn');
+  const kimEbanBtn = document.getElementById('kimEbanBtn');
+  const kimBioBtn = document.getElementById('kimBioBtn');
+  const kimHintBtn = document.getElementById('kimHintBtn');
+  const kimHomeBtn = document.getElementById('kimHomeBtn');
+
+  const kimChatLog = document.getElementById('kimChatLog');
+  const kimChatInput = document.getElementById('kimChatInput');
+  const kimChatSendBtn = document.getElementById('kimChatSendBtn');
+  const kimChatStatus = document.getElementById('kimChatStatus');
+
+  const clizmaModal = document.getElementById('clizmaModal');
+  const clizmaProgressBar = document.getElementById('clizmaProgressBar');
+  const clizmaProgressLabel = document.getElementById('clizmaProgressLabel');
+  const closeClizmaBtn = document.getElementById('closeClizmaBtn');
+
+  const ebanModal = document.getElementById('ebanModal');
+  const ebanProgressBar = document.getElementById('ebanProgressBar');
+  const ebanProgressLabel = document.getElementById('ebanProgressLabel');
+  const closeEbanBtn = document.getElementById('closeEbanBtn');
+
+  const bioModal = document.getElementById('bioModal');
+  const bioProgressBar = document.getElementById('bioProgressBar');
+  const bioProgressLabel = document.getElementById('bioProgressLabel');
+  const closeBioBtn = document.getElementById('closeBioBtn');
+
+  const pursuitModal = document.getElementById('pursuitModal');
+  const closePursuitBtn = document.getElementById('closePursuitBtn');
+
+  const homeModal = document.getElementById('homeModal');
+  const homeProgressBar = document.getElementById('homeProgressBar');
+  const homeProgressLabel = document.getElementById('homeProgressLabel');
+  const closeHomeBtn = document.getElementById('closeHomeBtn');
+
+  const horrorModal = document.getElementById('horrorModal');
+  const horrorTitle = document.getElementById('horrorTitle');
+  const horrorSub = document.getElementById('horrorSub');
+  const horrorEyes = document.getElementById('horrorEyes');
+  const closeHorrorBtn = document.getElementById('closeHorrorBtn');
+
+  const itogModal = document.getElementById('itogModal');
+  const itogTable = document.getElementById('itogTable');
+  const itogNote = document.getElementById('itogNote');
+  const itogScreamerBtn = document.getElementById('itogScreamerBtn');
+
+  const screamerModal = document.getElementById('screamerModal');
+
+  const logBox = document.getElementById('logBox');
+
+  const civDesc = document.getElementById('civDesc');
+  const civHealthFill = document.getElementById('civHealthFill');
+  const civHealthLabel = document.getElementById('civHealthLabel');
+
+  const homeDesc = document.getElementById('homeDesc');
+  const homeHealthFill = document.getElementById('homeHealthFill');
+  const homeHealthLabel = document.getElementById('homeHealthLabel');
+
+  const bodyDesc = document.getElementById('bodyDesc');
+  const bodyHealthFill = document.getElementById('bodyHealthFill');
+  const bodyHealthLabel = document.getElementById('bodyHealthLabel');
+
+  const answerInput = document.getElementById('answerInput');
+  const submitAnswerBtn = document.getElementById('submitAnswerBtn');
+  const forceFailBtn = document.getElementById('forceFailBtn');
+  const mathQuestion = document.getElementById('mathQuestion');
+  const mathHint = document.getElementById('mathHint');
+
+  const logQuestion = document.getElementById('logQuestion');
+  const logAnswerInput = document.getElementById('logAnswerInput');
+  const submitLogBtn = document.getElementById('submitLogBtn');
+  const logHint = document.getElementById('logHint');
+
+  const taskQuestion = document.getElementById('taskQuestion');
+  const taskAnswerInput = document.getElementById('taskAnswerInput');
+  const submitTaskBtn = document.getElementById('submitTaskBtn');
+  const taskHint = document.getElementById('taskHint');
+
+  const exQuestion = document.getElementById('exQuestion');
+  const exAnswerInput = document.getElementById('exAnswerInput');
+  const submitExBtn = document.getElementById('submitExBtn');
+  const exHint = document.getElementById('exHint');
+
+  let currentUser = null;
+  let clizmaInterval = null, ebanInterval = null, bioInterval = null, homeInterval = null;
+  let currentFlashLevel = 0;
+  let pendingEssayRequired = false;
+  let sessionStats = null;
+
+  // Задачи
+  const MATH_TASKS = [
+    { q: '7 × 8 = ?', a: 56, hint: '7 × 8 = 56.' },
+    { q: '9 × 6 = ?', a: 54, hint: '9 × 6 = 54.' },
+    { q: '12 × 12 = ?', a: 144, hint: '144.' },
+    { q: '15 + 27 = ?', a: 42, hint: '42.' },
+    { q: '100 − 37 = ?', a: 63, hint: '63.' },
+    { q: '8 × 9 = ?', a: 72, hint: '72.' },
+    { q: '√81 = ?', a: 9, hint: '9.' },
+    { q: '13 × 13 = ?', a: 169, hint: '169.' },
+    { q: '144 ÷ 12 = ?', a: 12, hint: '12.' },
+    { q: '2⁵ = ?', a: 32, hint: '32.' }
+  ];
+  const LOG_TASKS = [
+    { q: 'log₂(8) = ?', a: 3, hint: '2³ = 8.' },
+    { q: 'log₃(27) = ?', a: 3, hint: '3³ = 27.' },
+    { q: 'log₁₀(1000) = ?', a: 3, hint: '10³ = 1000.' },
+    { q: 'log₅(25) = ?', a: 2, hint: '5² = 25.' },
+    { q: 'log₂(1) = ?', a: 0, hint: '2⁰ = 1.' },
+    { q: 'log₄(64) = ?', a: 3, hint: '4³ = 64.' },
+    { q: 'log₇(49) = ?', a: 2, hint: '7² = 49.' },
+    { q: 'log₂(16) = ?', a: 4, hint: '2⁴ = 16.' }
+  ];
+  const WORD_TASKS = [
+    { q: 'Петя имел 15, отдал 5. Сколько?', a: 10, hint: '15 − 5 = 10.' },
+    { q: 'В классе 30, 12 девочек. Мальчиков?', a: 18, hint: '30 − 12 = 18.' },
+    { q: 'Авто 3 ч, 60 км/ч. Путь?', a: 180, hint: '3 × 60 = 180.' },
+    { q: 'Продали 45, осталось 55. Было?', a: 100, hint: '45 + 55 = 100.' },
+    { q: '8 деталей/час, 5 ч. Сколько?', a: 40, hint: '8 × 5 = 40.' }
+  ];
+  const EX_TASKS = [
+    { q: '(12 + 8) × 3 = ?', a: 60, hint: '20 × 3 = 60.' },
+    { q: '15 − 3 × 4 = ?', a: 3, hint: '15 − 12 = 3.' },
+    { q: '(25 − 5) ÷ 4 = ?', a: 5, hint: '20 ÷ 4 = 5.' },
+    { q: '2³ + 3² = ?', a: 17, hint: '8 + 9 = 17.' },
+    { q: '100 ÷ (5 + 5) = ?', a: 10, hint: '100 ÷ 10 = 10.' }
+  ];
+  let currentMathTask = 0, currentLogTask = 0, currentWordTask = 0, currentExTask = 0;
+
+  // Лог
+  let logArr = loadLog();
+  function renderLog() {
+    logBox.innerHTML = '';
+    logArr.slice(-100).forEach(entry => {
+      const div = document.createElement('div');
+      div.className = 'log-line ' + (entry.type || 'sys');
+      div.textContent = entry.text;
+      logBox.appendChild(div);
+    });
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+  function addLog(text, type = 'sys') {
+    const t = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    logArr.push({ text: `[${t}] ${text}`, type });
+    if (logArr.length > 400) logArr = logArr.slice(-400);
+    saveLog(logArr);
+    renderLog();
+  }
+
+  function loadUserData(nick) { return loadUsers()[nick] || null; }
+  function saveUserData(nick, data) {
+    const users = loadUsers();
+    users[nick] = data;
+    saveUsers(users);
+  }
+  function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+  // ── ЭФФЕКТЫ ──
+  function triggerFlash() {
+    currentFlashLevel++;
+    const intensity = Math.min(1, 0.15 + currentFlashLevel * 0.15);
+    const duration = 120 + currentFlashLevel * 80;
+    flashOverlay.style.transition = `opacity ${duration}ms ease`;
+    flashOverlay.style.opacity = intensity;
+    appContainer.classList.add('shake');
+    horrorVignette.style.opacity = Math.min(0.9, currentFlashLevel * 0.3);
+    setTimeout(() => {
+      flashOverlay.style.opacity = '0';
+      appContainer.classList.remove('shake');
+    }, duration + 50);
+
+    // Кровь и глаза при высоком уровне
+    if (currentFlashLevel >= 2) spawnBlood();
+    if (currentFlashLevel >= 4) spawnEyes();
+  }
+
+  function spawnBlood() {
+    const count = Math.min(20, currentFlashLevel * 4);
+    for (let i = 0; i < count; i++) {
+      const drop = document.createElement('div');
+      drop.className = 'blood-drop';
+      drop.style.left = Math.random() * 100 + '%';
+      drop.style.height = (20 + Math.random() * 40) + 'px';
+      drop.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      drop.style.animationDelay = (Math.random() * 1.5) + 's';
+      bloodLayer.appendChild(drop);
+      setTimeout(() => drop.remove(), 5000);
+    }
+    // Пятна
+    const splat = document.createElement('div');
+    splat.className = 'blood-splat';
+    splat.style.left = Math.random() * 80 + '%';
+    splat.style.top = Math.random() * 80 + '%';
+    bloodLayer.appendChild(splat);
+    setTimeout(() => splat.remove(), 8000);
+  }
+
+  function spawnEyes() {
+    const count = Math.min(8, Math.floor(currentFlashLevel / 2));
+    for (let i = 0; i < count; i++) {
+      const eye = document.createElement('div');
+      eye.className = 'eye';
+      eye.style.left = Math.random() * 80 + 5 + '%';
+      eye.style.top = Math.random() * 80 + 5 + '%';
+      eye.style.animationDelay = (Math.random() * 2) + 's';
+      eyesLayer.appendChild(eye);
+    }
+  }
+
+  function showHorrorModal(level) {
+    horrorModal.classList.remove('hidden');
+    const titles = ['ТЫ ОШИБСЯ', 'ТЫ СНОВА ОШИБСЯ', 'КИМ РАЗГНЕВАН', 'КИМ ИДЁТ К ТЕБЕ', 'КОШМАР БЛИЗКО', 'БЕГИ', 'ОН ЗДЕСЬ'];
+    const subs = [
+      'КИМ ВИДИТ ТЕБЯ. КИМ ЗНАЕТ, ГДЕ ТЫ ЖИВЁШЬ. КИМ ИДЁТ К ТЕБЕ.',
+      'ТЫ ОШИБСЯ СНОВА. КИМ ЗАПОМНИЛ. ОН УЖЕ ВЫЕХАЛ.',
+      'КИМ В ЯРОСТИ. ДВЕРЬ ТВОЕГО ДОМА СКОРО РУХНЕТ.',
+      'ОН БЛИЗКО. ТЫ СЛЫШИШЬ ШАГИ? ЭТО ОН.',
+      'КОШМАР СТАНОВИТСЯ РЕАЛЬНОСТЬЮ. КИМ НЕ ОСТАНОВИТСЯ.',
+      'БЕГИ. ИЛИ ОТВЕЧАЙ ПРАВИЛЬНО. ВЫБОР ЗА ТОБОЙ.',
+      'ОН ЗДЕСЬ. ЗА ТВОЕЙ СПИНОЙ. НЕ ОБОРАЧИВАЙСЯ.'
+    ];
+    horrorTitle.textContent = titles[Math.min(level, titles.length - 1)];
+    horrorSub.textContent = subs[Math.min(level, subs.length - 1)];
+    document.body.style.animation = 'screenShake 0.4s infinite';
+    addLog(`УЖАС УРОВЕНЬ ${level}`, 'horror');
+  }
+  function closeHorror() {
+    horrorModal.classList.add('hidden');
+    document.body.style.animation = '';
+  }
+
+  // ── СТАТЫ ──
+  function updateStats() {
+    if (!currentUser) return;
+    const nick = currentUser.nick;
+    const u = loadUserData(nick);
+    if (!u) return;
+
+    const rep = u.reputation !== undefined ? u.reputation : 100;
+    const mist = u.mistakes || 0;
+    const cliz = u.clizmas || 0;
+    const civ = u.civHealth !== undefined ? u.civHealth : 100;
+    const home = u.homeHealth !== undefined ? u.homeHealth : 100;
+    const body = u.bodyHealth !== undefined ? u.bodyHealth : 100;
+    const horrorLevel = u.horrorLevel || 0;
+
+    statRep.textContent = rep;
+    statMist.textContent = mist;
+    statCliz.textContent = cliz;
+    statCiv.textContent = civ + '%';
+    statHorror.textContent = horrorLevel;
+    statHome.textContent = home > 60 ? 'ЦЕЛ' : home > 30 ? 'ТРЕЩИТ' : home > 0 ? 'РУШИТСЯ' : 'ЗАХВАЧЕН';
+    statBody.textContent = body > 60 ? 'ЦЕЛО' : body > 30 ? 'ПОРАЖЕНО' : body > 0 ? 'АГОНИЯ' : 'УНИЧТОЖЕНО';
+
+    if (rep <= 30) statRep.style.color = '#ff4d4d';
+    else if (rep <= 60) statRep.style.color = '#ffb74d';
+    else statRep.style.color = '#a78bfa';
+
+    civHealthFill.style.width = civ + '%';
+    civHealthLabel.textContent = `ЗДОРОВЬЕ ЦИВИЛИЗАЦИИ: ${civ}%`;
+    if (civ <= 30) civHealthFill.style.background = 'linear-gradient(90deg, #6a1a1a, #ff4d4d)';
+    else if (civ <= 60) civHealthFill.style.background = 'linear-gradient(90deg, #6a5a1a, #ffb74d)';
+    else civHealthFill.style.background = 'linear-gradient(90deg, #00695c, #4dd0e1)';
+
+    homeHealthFill.style.width = home + '%';
+    homeHealthLabel.textContent = `ПРОЧНОСТЬ ДОМА: ${home}%`;
+    if (home <= 30) homeHealthFill.style.background = 'linear-gradient(90deg, #6a1a0a, #ff2a2a)';
+    else if (home <= 60) homeHealthFill.style.background = 'linear-gradient(90deg, #6a4a0a, #ffb74d)';
+    else homeHealthFill.style.background = 'linear-gradient(90deg, #6a3a0a, #ffb74d)';
+
+    bodyHealthFill.style.width = body + '%';
+    bodyHealthLabel.textContent = `ЗДОРОВЬЕ ТЕЛА: ${body}%`;
+    if (body <= 30) bodyHealthFill.style.background = 'linear-gradient(90deg, #6a0a3a, #ff2a2a)';
+    else if (body <= 60) bodyHealthFill.style.background = 'linear-gradient(90deg, #6a1a4a, #ffb74d)';
+    else bodyHealthFill.style.background = 'linear-gradient(90deg, #6a0a3a, #ff6b9d)';
+
+    const pursuit = u.pursuit || 0;
+    pursuitFill.style.width = pursuit + '%';
+    pursuitChaser.style.left = Math.max(0, pursuit - 3) + '%';
+    if (pursuit >= 80) { pursuitStatus.textContent = 'КРИТИЧЕСКОЕ'; pursuitStatus.style.color = '#ff4d4d'; }
+    else if (pursuit >= 50) { pursuitStatus.textContent = 'АКТИВНОЕ'; pursuitStatus.style.color = '#ffb74d'; }
+    else if (pursuit >= 20) { pursuitStatus.textContent = 'НАБЛЮДЕНИЕ'; pursuitStatus.style.color = '#ffd54f'; }
+    else { pursuitStatus.textContent = 'СПОКОЙНО'; pursuitStatus.style.color = '#6bdf9f'; }
+
+    if (civ <= 20) civDesc.textContent = '⚠️ КРИТИЧЕСКОЕ СОСТОЯНИЕ. Цивилизация на грани падения.';
+    else if (civ <= 50) civDesc.textContent = '⚠️ Цивилизация ослаблена. Ким усилил надзор.';
+    else civDesc.textContent = 'Твоя цивилизация — цифровое общество на дисциплине. Ошибки подрывают устои.';
+
+    if (home <= 30) homeDesc.textContent = '⚠️ ДОМ РУШИТСЯ. Ким у двери.';
+    else if (home <= 60) homeDesc.textContent = '⚠️ Дверь трещит. Ким приближается.';
+    else homeDesc.textContent = 'Ким знает твой адрес. Каждая ошибка приближает его.';
+
+    if (body <= 30) bodyDesc.textContent = '⚠️ ТЕЛО ПОРАЖЕНО БИООРУЖИЕМ. Агония.';
+    else if (body <= 60) bodyDesc.textContent = '⚠️ Тело ослаблено. Биологическое оружие действует.';
+    else bodyDesc.textContent = 'Ким применяет биологическое оружие за каждую ошибку. Тело поражается. При 0% — тело уничтожено. Ты будешь жить в агонии. Навсегда.';
+  }
+
+  // ── КИМ ──
+  const kimPhrases = {
+    motivate: [
+      'Ты способен на большее. Ошибка — это слабость. Соберись.',
+      'Каждый правильный ответ — шаг к свободе. Каждая ошибка — шаг к биорружию.',
+      'Я видел многих. Выживают только те, кто не ошибается. Сосредоточься.',
+      'Ким верит в тебя. Но дисциплина превыше всего. Ошибка = наказание = биорружие.'
+    ],
+    scare: [
+      'Ошибёшься — получишь ноль, клизму, ебан, биорружие и я приду домой. Ты заперт навсегда.',
+      'Одна ошибка — рейтинг рухнет. Ты в изоляции. Клизма — первый этап. Потом — биорружие.',
+      'Я — Ким. Я не злой. Я справедливый. Ошибся — биорружие. Ошибся дважды — ебан.',
+      'Знаешь, что страшнее клизмы? Биорружие. Твоё тело. Твоя кровь. Твои глаза. На экране.',
+      'Страх мобилизует. Бойся ошибки. Бойся меня. Бойся биорружия. И тогда ответишь правильно.'
+    ],
+    clizma: [
+      'Клизма — дисциплинарная процедура. 2 литра. Ледяная. Стоять смирно.',
+      'Клизма — урок смирения. Урок дисциплины. Запомни.',
+      'Я лично слежу. Ты будешь стоять. Ты будешь терпеть. И ты запомнишь навсегда.',
+      'Клизма не наказание. Это исправление. Ты станешь чище.'
+    ],
+    eban: [
+      'Ебан — физическое воздействие. Я лично применю. Не сопротивляйся.',
+      'Ебан — когда слова заканчиваются. Только боль. Только я.',
+      'Ты ошибся. Теперь ебан. Я не остановлюсь.',
+      'Ебан — урок, который ты не забудешь никогда.'
+    ],
+    bio: [
+      'Биологическое оружие — высшая мера. Твоё тело поражается. Ты не умрёшь — будешь жить в агонии.',
+      'Биорружие — это когда тело перестаёт быть твоим. Ким контролирует его. Навсегда.',
+      'Кровь. Глаза. Боль. Это биорружие. И это только начало.',
+      'Ты ошибся. Биорружие применено. Твоё тело — поле боя. Ким побеждает.'
+    ],
+    hint: [
+      'Подсказка: не торопись. Прочитай вопрос дважды.',
+      'Подсказка: разбей задачу на шаги.',
+      'Подсказка: проверь свой ответ. Умножь обратно.',
+      'Подсказка: 7 × 8 = 56. Таблица умножения.',
+      'Подсказка: логарифм — степень. log₂(8) = 3, потому что 2³ = 8.'
+    ],
+    home: [
+      'Твой дом — крепость. Для меня — просто дверь. Я выломаю её.',
+      'Я знаю твой адрес. Я знаю, где ты живёшь. Каждая ошибка приближает меня.',
+      'Дом — последнее убежище. Когда я выломаю дверь — убежища не будет.',
+      'Прочность дома тает. При 0% — я вхожу. И остаюсь. Навсегда.'
+    ]
+  };
+  function randomPhrase(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function kimSay(text) {
+    kimSpeech.textContent = text;
+    kimSpeech.style.opacity = '0.3';
+    setTimeout(() => { kimSpeech.style.opacity = '1'; }, 120);
+  }
+
+  // ── ЧАТ ──
+  function addKimChatMsg(who, text) {
+    const div = document.createElement('div');
+    div.className = 'kim-chat-msg from-' + who;
+    div.innerHTML = `<span class="who">${who === 'kim' ? 'КИМ' : 'ТЫ'}</span>${escapeHtml(text)}`;
+    kimChatLog.appendChild(div);
+    kimChatLog.scrollTop = kimChatLog.scrollHeight;
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  function kimRespond(userText) {
+    const lower = userText.toLowerCase();
+    const nick = currentUser ? currentUser.nick : 'ученик';
+
+    if (pendingEssayRequired) {
+      const words = userText.trim().split(/\s+/).filter(w => w.length > 0).length;
+      const hasNumbers = /\d/.test(userText);
+      const hasExplanation = lower.includes('потому') || lower.includes('так как') || lower.includes('объясн') || lower.includes('решен') || lower.includes('ответ') || lower.includes('равно') || lower.includes('степень') || lower.includes('умнож');
+
+      if (words >= 25 && hasNumbers && hasExplanation) {
+        pendingEssayRequired = false;
+        kimChatStatus.textContent = 'ЭССЕ ПРИНЯТО';
+        kimChatStatus.style.color = '#6bdf9f';
+        const u = loadUserData(nick);
+        if (u) {
+          u.reputation = clamp((u.reputation || 100) + 10, 0, 100);
+          u.homeHealth = clamp((u.homeHealth || 100) + 15, 0, 100);
+          u.bodyHealth = clamp((u.bodyHealth || 100) + 15, 0, 100);
+          u.horrorLevel = Math.max(0, (u.horrorLevel || 0) - 1);
+          saveUserData(nick, u);
+          updateStats();
+        }
+        addKimChatMsg('kim', `✅ ЭССЕ ПРИНЯТО, ${nick}. ${words} слов, с числами и объяснением. Я доволен. Репутация +10, дом +15%, тело +15%. Но помни: следующая ошибка — и я снова потребую эссе. Или хуже.`);
+        addLog(`ЭССЕ ПРИНЯТО от ${nick} (${words} слов)`, 'ok');
+        return;
+      } else {
+        kimChatStatus.textContent = 'ЭССЕ НЕ ПРИНЯТО';
+        kimChatStatus.style.color = '#ff4d4d';
+        addKimChatMsg('kim', `❌ ЭССЕ НЕ ПРИНЯТО. Требования: минимум 25 слов, числа, объяснение (почему, так как, решение, ответ). Ты написал ${words} слов. ${hasNumbers ? '' : 'Нет чисел. '}${hasExplanation ? '' : 'Нет объяснения. '}Пиши заново. Или получишь биорружие.`);
+        const u = loadUserData(nick);
+        if (u) {
+          u.reputation = clamp((u.reputation || 100) - 5, 0, 100);
+          u.homeHealth = clamp((u.homeHealth || 100) - 5, 0, 100);
+          u.bodyHealth = clamp((u.bodyHealth || 100) - 8, 0, 100);
+          saveUserData(nick, u);
+          updateStats();
+        }
+        return;
+      }
+    }
+
+    if (lower.includes('привет') || lower.includes('здравствуй') || lower.includes('хай')) {
+      addKimChatMsg('kim', `Приветствую, ${nick}. Я вижу тебя. Я вижу твой дом. Я вижу твоё тело. Что ты хочешь?`);
+    } else if (lower.includes('клизм')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.clizma));
+    } else if (lower.includes('био') || lower.includes('оружи') || lower.includes('биол')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.bio));
+    } else if (lower.includes('ебан') && !lower.includes('отебан')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.eban));
+    } else if (lower.includes('дом') || lower.includes('дверь')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.home));
+    } else if (lower.includes('помог') || lower.includes('подскаж')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.hint));
+    } else if (lower.includes('страш') || lower.includes('боюсь') || lower.includes('ужас')) {
+      addKimChatMsg('kim', randomPhrase(kimPhrases.scare));
+    } else if (lower.includes('эссе') || lower.includes('объясн') || lower.includes('напишу')) {
+      addKimChatMsg('kim', 'Эссе? Хорошо. Напиши мне: что такое логарифм, как решить 7 × 8, и почему ты не должен ошибаться. Минимум 25 слов, с числами и объяснением. Я проверю.');
+    } else if (lower.includes('7') && lower.includes('8')) {
+      addKimChatMsg('kim', '7 × 8 = 56. Это просто. Запомни. Или получишь биорружие.');
+    } else if (lower.includes('log') || lower.includes('логар')) {
+      addKimChatMsg('kim', 'Логарифм — степень. log₂(8) = 3, потому что 2³ = 8. Понимаешь? Если нет — напиши эссе. Или накажу.');
+    } else if (lower.includes('ошиб') || lower.includes('прости')) {
+      addKimChatMsg('kim', 'Прощения? Нет. Ошибки наказываются. Клизмой. Ебаном. Биорружием. Вторжением. Такова система.');
+    } else {
+      addKimChatMsg('kim', `Я слышу тебя, ${nick}. Но слова без объяснения — пусты. Напиши конкретно. Или я потребую эссе. Или накажу.`);
+    }
+  }
+
+  function sendKimMessage() {
+    if (!currentUser) return;
+    const text = kimChatInput.value.trim();
+    if (!text) return;
+    addKimChatMsg('user', text);
+    kimChatInput.value = '';
+    setTimeout(() => kimRespond(text), 400);
+  }
+
+  // ── НАКАЗАНИЯ ──
+  function choosePunishmentType(level) {
+    if (level >= 5) return 'bio';
+    if (level >= 3) return 'eban';
+    return 'clizma';
+  }
+
+  function runClizma(callback) {
+    clizmaModal.classList.remove('hidden');
+    clizmaProgressBar.style.width = '0%';
+    clizmaProgressLabel.textContent = 'ОЖИДАНИЕ... 0%';
+    closeClizmaBtn.disabled = true;
+    closeClizmaBtn.textContent = 'ПРОЦЕДУРА НЕ ЗАВЕРШЕНА';
+    let p = 0;
+    if (clizmaInterval) clearInterval(clizmaInterval);
+    clizmaInterval = setInterval(() => {
+      p += Math.random() * 8 + 3;
+      if (p >= 100) {
+        p = 100; clearInterval(clizmaInterval); clizmaInterval = null;
+        clizmaProgressBar.style.width = '100%';
+        clizmaProgressLabel.textContent = 'ЗАВЕРШЕНО. 100%';
+        closeClizmaBtn.disabled = false;
+        closeClizmaBtn.textContent = 'ЗАВЕРШИТЬ (ПРИНЯТЬ)';
+        if (callback) callback();
+      } else {
+        clizmaProgressBar.style.width = p + '%';
+        clizmaProgressLabel.textContent = `ПРОЦЕДУРА... ${Math.floor(p)}%`;
+      }
+    }, 150);
+  }
+  function closeClizma() {
+    if (clizmaInterval) { clearInterval(clizmaInterval); clizmaInterval = null; }
+    clizmaModal.classList.add('hidden');
+  }
+
+  function runEban(callback) {
+    ebanModal.classList.remove('hidden');
+    ebanProgressBar.style.width = '0%';
+    ebanProgressLabel.textContent = 'ОЖИДАНИЕ... 0%';
+    closeEbanBtn.disabled = true;
+    closeEbanBtn.textContent = 'ПРОЦЕДУРА НЕ ЗАВЕРШЕНА';
+    let p = 0;
+    if (ebanInterval) clearInterval(ebanInterval);
+    ebanInterval = setInterval(() => {
+      p += Math.random() * 6 + 2;
+      if (p >= 100) {
+        p = 100; clearInterval(ebanInterval); ebanInterval = null;
+        ebanProgressBar.style.width = '100%';
+        ebanProgressLabel.textContent = 'ЗАВЕРШЕНО. 100%';
+        closeEbanBtn.disabled = false;
+        closeEbanBtn.textContent = 'ЗАВЕРШИТЬ (ПРИНЯТЬ)';
+        if (callback) callback();
+      } else {
+        ebanProgressBar.style.width = p + '%';
+        ebanProgressLabel.textContent = `ЕБАН... ${Math.floor(p)}%`;
+      }
+    }, 140);
+  }
+  function closeEban() {
+    if (ebanInterval) { clearInterval(ebanInterval); ebanInterval = null; }
+    ebanModal.classList.add('hidden');
+  }
+
+  function runBio(callback) {
+    bioModal.classList.remove('hidden');
+    bioProgressBar.style.width = '0%';
+    bioProgressLabel.textContent = 'ОЖИДАНИЕ... 0%';
+    closeBioBtn.disabled = true;
+    closeBioBtn.textContent = 'ПРОЦЕДУРА НЕ ЗАВЕРШЕНА';
+    let p = 0;
+    if (bioInterval) clearInterval(bioInterval);
+    bioInterval = setInterval(() => {
+      p += Math.random() * 5 + 2;
+      if (p >= 100) {
+        p = 100; clearInterval(bioInterval); bioInterval = null;
+        bioProgressBar.style.width = '100%';
+        bioProgressLabel.textContent = 'ЗАРАЖЕНИЕ 100%';
+        closeBioBtn.disabled = false;
+        closeBioBtn.textContent = 'ПРИНЯТЬ ЗАРАЖЕНИЕ';
+        if (callback) callback();
+      } else {
+        bioProgressBar.style.width = p + '%';
+        bioProgressLabel.textContent = `БИОЗАРАЖЕНИЕ... ${Math.floor(p)}%`;
+      }
+    }, 130);
+  }
+  function closeBio() {
+    if (bioInterval) { clearInterval(bioInterval); bioInterval = null; }
+    bioModal.classList.add('hidden');
+  }
+
+  function runHomeInvasion(callback) {
+    homeModal.classList.remove('hidden');
+    homeProgressBar.style.width = '0%';
+    homeProgressLabel.textContent = 'ЗАХВАТ... 0%';
+    closeHomeBtn.disabled = true;
+    closeHomeBtn.textContent = 'ЗАХВАТ НЕ ЗАВЕРШЁН';
+    let p = 0;
+    if (homeInterval) clearInterval(homeInterval);
+    homeInterval = setInterval(() => {
+      p += Math.random() * 4 + 2;
+      if (p >= 100) {
+        p = 100; clearInterval(homeInterval); homeInterval = null;
+        homeProgressBar.style.width = '100%';
+        homeProgressLabel.textContent = 'ЗАХВАЧЕНО. 100%';
+        closeHomeBtn.disabled = false;
+        closeHomeBtn.textContent = 'ПРИНЯТЬ СУДЬБУ';
+        if (callback) callback();
+      } else {
+        homeProgressBar.style.width = p + '%';
+        homeProgressLabel.textContent = `ВЫЛАМЫВАЕТ ДВЕРЬ... ${Math.floor(p)}%`;
+      }
+    }, 160);
+  }
+  function closeHome() {
+    if (homeInterval) { clearInterval(homeInterval); homeInterval = null; }
+    homeModal.classList.add('hidden');
+  }
+
+  function closePursuit() { pursuitModal.classList.add('hidden'); }
+
+  // ── НАКАЗАНИЕ ──
+  function applyPunishment(source = 'wrong') {
+    if (!currentUser) return;
+    const nick = currentUser.nick;
+    const u = loadUserData(nick);
+    if (!u) return;
+
+    u.mistakes = (u.mistakes || 0) + 1;
+    u.clizmas = (u.clizmas || 0) + 1;
+    u.horrorLevel = (u.horrorLevel || 0) + 1;
+    currentFlashLevel = u.horrorLevel;
+
+    const repLoss = 15 + u.horrorLevel * 3;
+    const civLoss = 15 + u.horrorLevel * 4;
+    const homeLoss = 20 + u.horrorLevel * 5;
+    const bodyLoss = 15 + u.horrorLevel * 6;
+    u.reputation = clamp((u.reputation !== undefined ? u.reputation : 100) - repLoss, 0, 100);
+    u.civHealth = clamp((u.civHealth !== undefined ? u.civHealth : 100) - civLoss, 0, 100);
+    u.homeHealth = clamp((u.homeHealth !== undefined ? u.homeHealth : 100) - homeLoss, 0, 100);
+    u.bodyHealth = clamp((u.bodyHealth !== undefined ? u.bodyHealth : 100) - bodyLoss, 0, 100);
+    u.pursuit = clamp((u.pursuit || 0) + 10 + u.horrorLevel * 3, 0, 100);
+
+    saveUserData(nick, u);
+    updateStats();
+
+    triggerFlash();
+    showHorrorModal(u.horrorLevel);
+
+    const punType = choosePunishmentType(u.horrorLevel);
+
+    let punishText = `
+      ❌ ОШИБКА №${u.mistakes}. ОЦЕНКА: 0.<br><br>
+      ⚠️ НАКАЗАНИЕ:<br>
+      • Репутация: −${repLoss}<br>
+      • Цивилизация: −${civLoss}%<br>
+      • Дом: −${homeLoss}%<br>
+      • Тело: −${bodyLoss}% (БИООРУЖИЕ)<br>
+      • Преследование: +${10 + u.horrorLevel * 3}%<br>
+      • Ужас: ${u.horrorLevel}<br>
+      • Тип: ${punType === 'bio' ? 'БИООРУЖИЕ' : punType === 'eban' ? 'ЕБАН' : 'КЛИЗМА'}<br>
+    `;
+
+    if (u.bodyHealth <= 0) punishText += `<br><span style="color:#ff2a2a; font-weight:900;">⚠️ ТЕЛО УНИЧТОЖЕНО. ТЫ В АГОНИИ. НАВСЕГДА.</span>`;
+    if (u.homeHealth <= 0) punishText += `<br><span style="color:#ff2a2a; font-weight:900;">⚠️ ДОМ ЗАХВАЧЕН. КИМ ВНУТРИ.</span>`;
+
+    punishDetail.innerHTML = punishText;
+    punishZone.classList.remove('hidden');
+    successZone.classList.add('hidden');
+
+    [answerInput, logAnswerInput, taskAnswerInput, exAnswerInput, kimChatInput].forEach(el => { if (el) el.disabled = true; });
+    [submitAnswerBtn, submitLogBtn, submitTaskBtn, submitExBtn, kimChatSendBtn, forceFailBtn].forEach(el => { if (el) el.disabled = true; });
+
+    kimSay(`❌ Ошибка №${u.mistakes}. Ужас ${u.horrorLevel}. ${punType.toUpperCase()}. Тело −${bodyLoss}%. ${u.bodyHealth <= 0 ? 'ТЕЛО УНИЧТОЖЕНО.' : ''}`);
+    addLog(`ОШИБКА №${u.mistakes}: ужас ${u.horrorLevel}, ${punType.toUpperCase()}, тело ${u.bodyHealth}%`, 'err');
+
+    if (punType === 'clizma') runClizma();
+    else if (punType === 'eban') runEban();
+    else runBio();
+
+    if (u.pursuit >= 50) setTimeout(() => pursuitModal.classList.remove('hidden'), 600);
+    if (u.homeHealth <= 0) setTimeout(() => runHomeInvasion(), 1200);
+
+    if (u.horrorLevel >= 2) {
+      pendingEssayRequired = true;
+      kimChatStatus.textContent = 'ТРЕБУЕТСЯ ЭССЕ';
+      kimChatStatus.style.color = '#ff4d4d';
+      addKimChatMsg('kim', `☠️ ТЫ ОШИБСЯ ${u.mistakes} РАЗ. ТРЕБУЮ ЭССЕ. Напиши конкретное объяснение: что такое биорружие, как решить задачу (числа), и почему ты не должен ошибаться. Минимум 25 слов. С числами. С объяснением.`);
+    }
+  }
+
+  function resetAfterPunishment() {
+    if (!currentUser) return;
+    punishZone.classList.add('hidden');
+    successZone.classList.add('hidden');
+    [answerInput, logAnswerInput, taskAnswerInput, exAnswerInput, kimChatInput].forEach(el => { if (el) el.disabled = false; });
+    [submitAnswerBtn, submitLogBtn, submitTaskBtn, submitExBtn, kimChatSendBtn, forceFailBtn].forEach(el => { if (el) el.disabled = false; });
+    answerInput.value = ''; logAnswerInput.value = ''; taskAnswerInput.value = ''; exAnswerInput.value = '';
+    answerInput.focus();
+    kimSay('Ты получил наказание. Следующая ошибка — жёстче. Думай.');
+  }
+
+  // ── ПРОВЕРКА ──
+  function checkAnswerGeneric(inputEl, correctAnswer, taskType) {
+    if (!currentUser) return;
+    if (inputEl.disabled) return;
+    const raw = inputEl.value.trim();
+    if (raw === '' || isNaN(Number(raw))) { applyPunishment('wrong'); return; }
+    const answer = Number(raw);
+    if (answer === correctAnswer) {
+      successZone.classList.remove('hidden');
+      successMsg.textContent = `✅ ВЕРНО (${taskType}). НО РАССЛАБЛЯТЬСЯ НЕЛЬЗЯ.`;
+      punishZone.classList.add('hidden');
+      const u = loadUserData(currentUser.nick);
+      if (u) {
+        u.reputation = clamp((u.reputation || 100) + 2, 0, 100);
+        u.civHealth = clamp((u.civHealth || 100) + 1, 0, 100);
+        u.homeHealth = clamp((u.homeHealth || 100) + 3, 0, 100);
+        u.bodyHealth = clamp((u.bodyHealth || 100) + 3, 0, 100);
+        u.pursuit = clamp((u.pursuit || 0) - 3, 0, 100);
+        u.horrorLevel = Math.max(0, (u.horrorLevel || 0) - 1);
+        saveUserData(currentUser.nick, u);
+        updateStats();
+      }
+      inputEl.disabled = true;
+      kimSay(`✅ Верно. ${taskType} — зачёт. Дом +3%, тело +3%. Но помни: ошибка рядом.`);
+      setTimeout(() => {
+        if (!currentUser) return;
+        inputEl.disabled = false;
+        inputEl.value = '';
+        inputEl.focus();
+        successZone.classList.add('hidden');
+      }, 1800);
+    } else {
+      applyPunishment('wrong');
+    }
+  }
+
+  function loadMathTask() {
+    const t = MATH_TASKS[currentMathTask % MATH_TASKS.length];
+    mathQuestion.textContent = t.q;
+    mathHint.textContent = 'Подсказка: ' + t.hint;
+  }
+  function loadLogTask() {
+    const t = LOG_TASKS[currentLogTask % LOG_TASKS.length];
+    logQuestion.textContent = t.q;
+    logHint.textContent = 'Подсказка: ' + t.hint;
+  }
+  function loadWordTask() {
+    const t = WORD_TASKS[currentWordTask % WORD_TASKS.length];
+    taskQuestion.textContent = t.q;
+    taskHint.textContent = 'Подсказка: ' + t.hint;
+  }
+  function loadExTask() {
+    const t = EX_TASKS[currentExTask % EX_TASKS.length];
+    exQuestion.textContent = t.q;
+    exHint.textContent = 'Подсказка: ' + t.hint;
+  }
+
+  // Табы
+  const tabs = document.querySelectorAll('.tab');
+  const tabContents = {
+    math: document.getElementById('tab-math'),
+    log: document.getElementById('tab-log'),
+    task: document.getElementById('tab-task'),
+    example: document.getElementById('tab-example'),
+    civ: document.getElementById('tab-civ'),
+    home: document.getElementById('tab-home'),
+    body: document.getElementById('tab-body')
+  };
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const key = tab.dataset.tab;
+      Object.keys(tabContents).forEach(k => tabContents[k].classList.toggle('hidden', k !== key));
+      if (key === 'math') loadMathTask();
+      if (key === 'log') loadLogTask();
+      if (key === 'task') loadWordTask();
+      if (key === 'example') loadExTask();
+      if (key === 'civ' || key === 'home' || key === 'body') updateStats();
+    });
+  });
+
+  // Панели
+  function showRegisterPanel() {
+    registerPanel.classList.remove('hidden');
+    loginPanel.classList.remove('hidden');
+    trainingPanel.classList.add('hidden');
+  }
+  function showTrainingPanel(nick) {
+    registerPanel.classList.add('hidden');
+    loginPanel.classList.add('hidden');
+    trainingPanel.classList.remove('hidden');
+    currentNickDisplay.textContent = nick;
+    punishZone.classList.add('hidden');
+    successZone.classList.add('hidden');
+    [answerInput, logAnswerInput, taskAnswerInput, exAnswerInput, kimChatInput].forEach(el => { if (el) el.disabled = false; });
+    [submitAnswerBtn, submitLogBtn, submitTaskBtn, submitExBtn, kimChatSendBtn, forceFailBtn].forEach(el => { if (el) el.disabled = false; });
+    answerInput.value = '';
+    hideMsg(registerMsg); hideMsg(loginMsg);
+    updateStats();
+    const u = loadUserData(nick);
+    kimSay(`Приветствую, ${nick}. Ты в изоляции навсегда. Аккаунт нельзя заблокировать — ты уже заперт. Ошибка — биорружие. Думай.`);
+    addLog(`Вход: ${nick} (вечная изоляция)`, 'ok');
+  }
+  function hideMsg(el) { el.classList.add('hidden'); el.textContent = ''; }
+  function showMsg(el, text, type = 'error') {
+    el.textContent = text;
+    el.className = `status ${type}`;
+    el.classList.remove('hidden');
+  }
+
+  // Регистрация
+  function register() {
+    const nick = regNick.value.trim();
+    const pass = regPass.value.trim();
+    const addr = regAddr.value.trim();
+    if (!nick || !pass) { showMsg(registerMsg, '❌ НИК И ПАРОЛЬ ОБЯЗАТЕЛЬНЫ.', 'error'); return; }
+    if (!addr) { showMsg(registerMsg, '❌ АДРЕС ОБЯЗАТЕЛЕН. КИМ ДОЛЖЕН ЗНАТЬ.', 'error'); return; }
+    if (nick.length < 2) { showMsg(registerMsg, '❌ НИК КОРОТКИЙ.', 'error'); return; }
+    if (pass.length < 3) { showMsg(registerMsg, '❌ ПАРОЛЬ КОРОТКИЙ.', 'error'); return; }
+    const users = loadUsers();
+    if (users[nick]) { showMsg(registerMsg, `❌ НИК «${nick}» ЗАНЯТ.`, 'error'); return; }
+    users[nick] = {
+      password: pass, address: addr,
+      mistakes: 0, clizmas: 0,
+      reputation: 100, civHealth: 100, homeHealth: 100, bodyHealth: 100,
+      pursuit: 0, horrorLevel: 0,
+      blocked: false,
+      registered: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    };
+    saveUsers(users);
+    addLog(`РЕГИСТРАЦИЯ: ${nick}, адрес: ${addr}`, 'ok');
+    showMsg(registerMsg, `✅ УЧЕНИК «${nick}» ЗАРЕГИСТРИРОВАН. ТЫ В ИЗОЛЯЦИИ НАВСЕГДА.`, 'success');
+    regNick.value = ''; regPass.value = ''; regAddr.value = '';
+    loginNick.value = nick;
+  }
+
+  // Вход
+  function login() {
+    const nick = loginNick.value.trim();
+    const pass = loginPass.value.trim();
+    if (!nick || !pass) { showMsg(loginMsg, '❌ ВВЕДИТЕ НИК И ПАРОЛЬ.', 'error'); return; }
+    const users = loadUsers();
+    const user = users[nick];
+    if (!user) { showMsg(loginMsg, `❌ ПОЛЬЗОВАТЕЛЬ «${nick}» НЕ НАЙДЕН.`, 'error'); return; }
+    if (user.password !== pass) { showMsg(loginMsg, '❌ НЕВЕРНЫЙ ПАРОЛЬ.', 'error'); return; }
+    // Блокировка НЕ проверяется — аккаунт никогда не блокируется
+    user.lastLogin = new Date().toISOString();
+    saveUsers(users);
+    currentUser = { nick };
+    saveSession(nick);
+    currentFlashLevel = user.horrorLevel || 0;
+    sessionStats = {
+      startTime: new Date().toISOString(),
+      mistakes: user.mistakes || 0,
+      clizmas: user.clizmas || 0,
+      reputation: user.reputation || 100,
+      civHealth: user.civHealth || 100,
+      homeHealth: user.homeHealth || 100,
+      bodyHealth: user.bodyHealth || 100,
+      horrorLevel: user.horrorLevel || 0,
+      pursuit: user.pursuit || 0
+    };
+    showTrainingPanel(nick);
+    hideMsg(loginMsg);
+    loginNick.value = ''; loginPass.value = '';
+    answerInput.focus();
+    loadMathTask();
+  }
+
+  // Автовход
+  function tryAutoLogin() {
+    const saved = loadSession();
+    if (!saved) return false;
+    const users = loadUsers();
+    const u = users[saved];
+    if (!u) return false;
+    // НЕ проверяем blocked — аккаунт никогда не блокируется
+    currentUser = { nick: saved };
+    currentFlashLevel = u.horrorLevel || 0;
+    sessionStats = {
+      startTime: new Date().toISOString(),
+      mistakes: u.mistakes || 0,
+      clizmas: u.clizmas || 0,
+      reputation: u.reputation || 100,
+      civHealth: u.civHealth || 100,
+      homeHealth: u.homeHealth || 100,
+      bodyHealth: u.bodyHealth || 100,
+      horrorLevel: u.horrorLevel || 0,
+      pursuit: u.pursuit || 0
+    };
+    showTrainingPanel(saved);
+    loadMathTask();
+    addLog(`АВТОВХОД: ${saved}`, 'sys');
+    return true;
+  }
+
+  // Выход
+  function logout() {
+    if (currentUser) addLog(`Выход: ${currentUser.nick} (сессия сохранена)`, 'sys');
+    currentUser = null;
+    showRegisterPanel();
+    regNick.value = ''; regPass.value = ''; regAddr.value = '';
+    loginNick.value = ''; loginPass.value = '';
+    [answerInput, logAnswerInput, taskAnswerInput, exAnswerInput].forEach(el => { if (el) el.value = ''; });
+    punishZone.classList.add('hidden');
+    successZone.classList.add('hidden');
+    closeClizma(); closeEban(); closeBio(); closeHome(); closePursuit(); closeHorror();
+    kimSay('Я — Ким. Ты в изоляции навсегда. Войди снова. Ошибка = биорружие.');
+  }
+
+  // ── ИТОГ СЕАНСА ──
+  function showItog() {
+    if (!currentUser) { alert('Сначала войдите.'); return; }
+    const nick = currentUser.nick;
+    const u = loadUserData(nick);
+    if (!u) return;
+
+    const now = new Date();
+    const start = sessionStats ? new Date(sessionStats.startTime) : now;
+    const durationSec = Math.max(1, Math.floor((now - start) / 1000));
+    const mins = Math.floor(durationSec / 60);
+    const secs = durationSec % 60;
+
+    const rows = [
+      ['НИК', nick, ''],
+      ['АДРЕС', u.address || '—', ''],
+      ['ДАТА РЕГИСТРАЦИИ', new Date(u.registered).toLocaleString('ru-RU'), ''],
+      ['ПОСЛЕДНИЙ ВХОД', new Date(u.lastLogin).toLocaleString('ru-RU'), ''],
+      ['ДЛИТЕЛЬНОСТЬ СЕАНСА', `${mins} мин ${secs} сек`, ''],
+      ['ОШИБОК ВСЕГО', String(u.mistakes || 0), 'critical'],
+      ['КЛИЗМ', String(u.clizmas || 0), 'critical'],
+      ['РЕПУТАЦИЯ', String(u.reputation !== undefined ? u.reputation : 100), u.reputation <= 30 ? 'critical' : u.reputation >= 80 ? 'good' : ''],
+      ['ЦИВИЛИЗАЦИЯ', (u.civHealth !== undefined ? u.civHealth : 100) + '%', u.civHealth <= 30 ? 'critical' : u.civHealth >= 80 ? 'good' : ''],
+      ['ДОМ', (u.homeHealth !== undefined ? u.homeHealth : 100) + '%', u.homeHealth <= 30 ? 'critical' : u.homeHealth >= 80 ? 'good' : ''],
+      ['ТЕЛО', (u.bodyHealth !== undefined ? u.bodyHealth : 100) + '%', u.bodyHealth <= 30 ? 'critical' : u.bodyHealth >= 80 ? 'good' : ''],
+      ['УРОВЕНЬ УЖАСА', String(u.horrorLevel || 0), (u.horrorLevel || 0) >= 3 ? 'critical' : ''],
+      ['ПРЕСЛЕДОВАНИЕ', (u.pursuit || 0) + '%', (u.pursuit || 0) >= 50 ? 'critical' : ''],
+      ['СТАТУС', 'В ИЗОЛЯЦИИ НАВСЕГДА', 'critical'],
+      ['ЗАБЛОКИРОВАН', 'НЕТ (НЕВОЗМОЖНО)', 'good'],
+      ['ВЫРВАННЫЕ ГЛАЗА', u.horrorLevel >= 4 ? 'ДА (НА ЭКРАНЕ)' : 'ПОКА НЕТ', u.horrorLevel >= 4 ? 'critical' : ''],
+      ['КРОВЬ НА ЭКРАНЕ', u.horrorLevel >= 2 ? 'ДА' : 'НЕТ', u.horrorLevel >= 2 ? 'critical' : ''],
+      ['ПОСЛЕДСТВИЯ', u.homeHealth <= 0 ? 'ДОМ ЗАХВАЧЕН' : u.bodyHealth <= 0 ? 'ТЕЛО УНИЧТОЖЕНО' : u.horrorLevel >= 3 ? 'КОШМАР АКТИВЕН' : 'ПОД НАДЗОРОМ', 'critical'],
+      ['ИТОГ', 'ТЫ ЗАПЕРТ. ВЫХОДА НЕТ.', 'critical']
+    ];
+
+    itogTable.innerHTML = '<tr><th>ПАРАМЕТР</th><th>ЗНАЧЕНИЕ</th></tr>' +
+      rows.map(r => `<tr><td>${escapeHtml(r[0])}</td><td class="${r[2]}">${escapeHtml(r[1])}</td></tr>`).join('');
+
+    itogNote.textContent = `☠️ ${nick}, ТВОЙ СЕАНС ЗАВЕРШЁН. НО ТЫ НЕ СВОБОДЕН. ТЫ ЗАПЕРТ НАВСЕГДА. ЭТОТ ИТОГ — ТВОЙ ПРИГОВОР. КИМ ЖДЁТ. ☠️`;
+
+    itogModal.classList.remove('hidden');
+    addLog(`ИТОГ СЕАНСА: ${nick}, ошибок ${u.mistakes}, ужас ${u.horrorLevel}`, 'horror');
+  }
+
+  // ── СКРИМЕР + ЧЁРНЫЙ ЭКРАН ──
+  function triggerScreamer() {
+    itogModal.classList.add('hidden');
+    screamerModal.classList.remove('hidden');
+
+    // Звук скримера через Web Audio (громкий шум)
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const duration = 3;
+        const sampleRate = ctx.sampleRate;
+        const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          // Белый шум + низкий гул + высокий визг
+          const t = i / sampleRate;
+          const noise = (Math.random() * 2 - 1) * 0.6;
+          const low = Math.sin(2 * Math.PI * 60 * t) * 0.4;
+          const high = Math.sin(2 * Math.PI * 1800 * t) * 0.3 * (Math.sin(t * 30) > 0 ? 1 : 0);
+          data[i] = noise + low + high;
+        }
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = 1.0;
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        src.start();
+      }
+    } catch (e) { /* игнорируем */ }
+
+    // Через 4 секунды — чёрный экран навсегда
+    setTimeout(() => {
+      screamerModal.classList.add('hidden');
+      blackoutScreen.classList.add('active');
+      // Убираем всё остальное
+      document.body.innerHTML = '';
+      document.body.appendChild(blackoutScreen);
+      // Чёрный экран навсегда
+      blackoutScreen.style.display = 'flex';
+      blackoutScreen.style.background = '#000';
+      // Сохраняем факт поражения
+      localStorage.setItem(FINAL_KEY, 'defeated');
+    }, 4000);
+  }
+
+  // ── ОБРАБОТЧИКИ ──
+  registerBtn.addEventListener('click', register);
+  loginBtn.addEventListener('click', login);
+  logoutBtn.addEventListener('click', logout);
+  endSessionBtn.addEventListener('click', showItog);
+
+  submitAnswerBtn.addEventListener('click', () => {
+    const t = MATH_TASKS[currentMathTask % MATH_TASKS.length];
+    checkAnswerGeneric(answerInput, t.a, 'АРИФМЕТИКА');
+    if (answerInput.value.trim() !== '' && Number(answerInput.value) === t.a) {
+      currentMathTask++;
+      setTimeout(() => loadMathTask(), 1900);
+    }
+  });
+  submitLogBtn.addEventListener('click', () => {
+    const t = LOG_TASKS[currentLogTask % LOG_TASKS.length];
+    checkAnswerGeneric(logAnswerInput, t.a, 'ЛОГАРИФМЫ');
+    if (logAnswerInput.value.trim() !== '' && Number(logAnswerInput.value) === t.a) {
+      currentLogTask++;
+      setTimeout(() => loadLogTask(), 1900);
+    }
+  });
+  submitTaskBtn.addEventListener('click', () => {
+    const t = WORD_TASKS[currentWordTask % WORD_TASKS.length];
+    checkAnswerGeneric(taskAnswerInput, t.a, 'ЗАДАЧА');
+    if (taskAnswerInput.value.trim() !== '' && Number(taskAnswerInput.value) === t.a) {
+      currentWordTask++;
+      setTimeout(() => loadWordTask(), 1900);
+    }
+  });
+  submitExBtn.addEventListener('click', () => {
+    const t = EX_TASKS[currentExTask % EX_TASKS.length];
+    checkAnswerGeneric(exAnswerInput, t.a, 'ПРИМЕР');
+    if (exAnswerInput.value.trim() !== '' && Number(exAnswerInput.value) === t.a) {
+      currentExTask++;
+      setTimeout(() => loadExTask(), 1900);
+    }
+  });
+
+  forceFailBtn.addEventListener('click', () => {
+    if (!currentUser) return;
+    if (answerInput.disabled) return;
+    applyPunishment('forced');
+  });
+
+  resetAfterPunishBtn.addEventListener('click', resetAfterPunishment);
+
+  kimMotivateBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.motivate)));
+  kimScareBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.scare)));
+  kimClizmaBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.clizma)));
+  kimEbanBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.eban)));
+  kimBioBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.bio)));
+  kimHintBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.hint)));
+  kimHomeBtn.addEventListener('click', () => kimSay(randomPhrase(kimPhrases.home)));
+
+  kimChatSendBtn.addEventListener('click', sendKimMessage);
+  kimChatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendKimMessage(); } });
+
+  closeClizmaBtn.addEventListener('click', () => { if (!closeClizmaBtn.disabled) { closeClizma(); kimSay('Клизма завершена.'); } });
+  closeEbanBtn.addEventListener('click', () => { if (!closeEbanBtn.disabled) { closeEban(); kimSay('Ебан завершён.'); } });
+  closeBioBtn.addEventListener('click', () => { if (!closeBioBtn.disabled) { closeBio(); kimSay('Биорружие применено. Ты заражён.'); } });
+  closePursuitBtn.addEventListener('click', closePursuit);
+  closeHomeBtn.addEventListener('click', () => { if (!closeHomeBtn.disabled) { closeHome(); kimSay('Я в твоём доме. Навсегда.'); } });
+  closeHorrorBtn.addEventListener('click', closeHorror);
+
+  itogScreamerBtn.addEventListener('click', triggerScreamer);
+
+  // Enter
+  regPass.addEventListener('keypress', (e) => { if (e.key === 'Enter') register(); });
+  loginPass.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+  answerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitAnswerBtn.click(); });
+  logAnswerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitLogBtn.click(); });
+  taskAnswerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitTaskBtn.click(); });
+  exAnswerInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') submitExBtn.click(); });
+
+  // Инициализация
+  renderLog();
+  loadMathTask(); loadLogTask(); loadWordTask(); loadExTask();
+
+  setInterval(() => {
+    if (currentUser) {
+      saveSession(currentUser.nick);
+      const u = loadUserData(currentUser.nick);
+      if (u) { u.lastActive = new Date().toISOString(); saveUserData(currentUser.nick, u); }
+    }
+  }, 5000);
+
+  // Если уже был финальный чёрный экран — не даём вернуться
+  if (localStorage.getItem(FINAL_KEY) === 'defeated') {
+    // Всё равно даём возможность, но с предупреждением
+    console.log('SDL: предыдущее поражение зафиксировано.');
+  }
+
+  if (!tryAutoLogin()) addLog('Сессия не найдена. Требуется вход.', 'sys');
+
+  console.log('SDL · АБСОЛЮТНЫЙ КОШМАР v2 активирован.');
+})();
+</script>
+</body>
+</html>
